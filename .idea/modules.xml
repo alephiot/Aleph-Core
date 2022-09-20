@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/aleph-core.iml" filepath="$PROJECT_DIR$/.idea/aleph-core.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../aleph-web/.idea/aleph-web.iml" filepath="$PROJECT_DIR$/../aleph-web/.idea/aleph-web.iml" />
+    </modules>
+  </component>
+</project>
