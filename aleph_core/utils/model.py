@@ -2,7 +2,7 @@
 TODO
 """
 
-from pydantic import BaseModel, Field
+from sqlmodel import SQLModel as BaseModel, Field
 from typing import Optional
 from uuid import uuid4
 
@@ -22,7 +22,7 @@ class Model(BaseModel):
 
     @property
     def key(self):
-        return self.__key__ if self.__key__ else self.__tablename__
+        return self.__key__ if self.__key__ else None
 
     @key.setter
     def key(self, value: str):

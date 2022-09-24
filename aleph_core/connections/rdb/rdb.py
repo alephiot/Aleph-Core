@@ -5,8 +5,8 @@ import sqlmodel
 
 
 class RDBConnection(Connection):
-    __engine__ = None
     url = ""
+    __engine__ = None
 
     def __init__(self, client_id=""):
         super().__init__(client_id)

@@ -1,4 +1,6 @@
 import random
+import time
+
 from unittest import TestCase
 from pydantic import ValidationError
 
@@ -44,6 +46,9 @@ class TestConnection(Connection):
         [{"value": "c"}],
     ]
 
+    x = -1
+    y = -1
+
     def read(self, key, **kwargs):
         if key == "A":
             return {
@@ -70,10 +75,17 @@ class TestConnection(Connection):
             return self.sequence_c[self.d]
 
     def write(self, key, data):
-        if key == "A":
-            self.written_values["A"] = data
-        elif key == "B":
-            self.written_values["B"] = data
+        if key == "X":
+            self.x += 1
+            if self.x < 2:
+                raise Exception("X")
+
+        if key == "Y":
+            self.y += 1
+            if self.y < 2:
+                raise Exception("Y")
+
+        self.written_values[key] = data
 
     def on_read_error(self, error):
         raise CaughtReadException(error.exception)
@@ -85,11 +97,11 @@ class TestConnection(Connection):
 class ConnectionTestCase(TestCase):
     conn = None
 
-    def setUp(self) -> None:
+    def setUp(self):
         self.conn = TestConnection()
         self.conn.open()
 
-    def tearDown(self) -> None:
+    def tearDown(self):
         self.conn.close()
 
     def test_read(self):
@@ -133,8 +145,82 @@ class ConnectionTestCase(TestCase):
         self.assertTrue("id_" in self.conn.written_values.get("B")[0])
 
     def test_report_by_exception(self):
-        pass
+        self.conn.report_by_exception = True
+        _data = [
+            {"id_": "1", "a": "alpha", "b": 1},
+            {"id_": "2", "a": "gamma", "b": 1},
+            {"id_": "3", "a": "delta", "b": 1},
+        ]
+        self.conn.safe_write("C", _data)
+        self.assertEqual(self.conn.written_values.get("C"), _data)
+
+        _data = [
+            {"id_": "1", "a": "hello", "b": 1},
+            {"id_": "2", "a": "gamma", "b": 2}
+        ]
+        self.conn.safe_write("C", _data)
+        self.assertEqual(self.conn.written_values.get("C"), [
+            {"id_": "1", "a": "hello"},
+            {"id_": "2", "b": 2}
+        ])
+
+        # Now the same but without report by exception
+        self.conn.report_by_exception = False
+        _data = [
+            {"id_": "1", "a": "alpha", "b": 1},
+            {"id_": "2", "a": "gamma", "b": 1},
+            {"id_": "3", "a": "delta", "b": 1},
+        ]
+        self.conn.safe_write("D", _data)
+        self.assertEqual(self.conn.written_values.get("D"), _data)
+
+        _data = [
+            {"id_": "1", "a": "hello", "b": 1},
+            {"id_": "2", "a": "gamma", "b": 2}
+        ]
+        self.conn.safe_write("D", _data)
+        self.assertNotEqual(self.conn.written_values.get("D"), [
+            {"id_": "1", "a": "hello"},
+            {"id_": "2", "b": 2}
+        ])
 
     def test_store_and_forward(self):
-        pass
+        self.conn.store_and_forward = True
 
+        try:
+            self.conn.safe_write("X", {"a": 1})
+        except Exception as e:
+            self.assertTrue(isinstance(e, CaughtWriteException))
+
+        time.sleep(1)
+        try:
+            self.conn.safe_write("X", {"a": 2})
+        except Exception as e:
+            self.assertTrue(isinstance(e, CaughtWriteException))
+
+        time.sleep(1)
+        self.conn.safe_write("X", {"a": 3})
+        _data = self.conn.written_values.get("X")
+        self.assertTrue(len(_data), 3)
+        self.assertTrue(_data[0].get("a"), 1)
+        self.assertTrue(_data[1].get("a"), 2)
+        self.assertTrue(_data[2].get("a"), 3)
+
+        # Now the same but without store and forward
+        self.conn.store_and_forward = False
+        try:
+            self.conn.safe_write("Y", {"a": 1})
+        except Exception as e:
+            self.assertTrue(isinstance(e, CaughtWriteException))
+
+        time.sleep(1)
+        try:
+            self.conn.safe_write("Y", {"a": 2})
+        except Exception as e:
+            self.assertTrue(isinstance(e, CaughtWriteException))
+
+        time.sleep(1)
+        self.conn.safe_write("Y", {"a": 3})
+        _data = self.conn.written_values.get("Y")
+        self.assertTrue(len(_data), 1)
+        self.assertTrue(_data[0].get("a"), 3)

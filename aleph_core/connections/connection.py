@@ -238,7 +238,7 @@ class Connection(ABC):
 
         try:
             if not self.is_open(): self.open()
-            self.flush_store_and_forward_buffer(key, data)
+            self.flush_buffer(key, data)
         except Exception as e:
             self.close()
             self.on_write_error(Error(e, client_id=self.client_id, key=key, data=data))
@@ -252,18 +252,22 @@ class Connection(ABC):
 
         try:
             if not self.is_open(): self.open()
-            await self._flush_store_and_forward_buffer(key, data)
+            await self._flush_buffer(key, data)
         except Exception as e:
             self.close()
             self.on_write_error(Error(e, client_id=self.client_id, key=key, data=data))
 
-    def flush_store_and_forward_buffer(self, key, data=None):
+    def flush_buffer(self, key, data=None):
+        if not self.store_and_forward:
+            self.write(key, data)
+            return
+
         buffer = self.local_storage.get(SNF_BUFFER, {})
 
         # Add new data to buffer and save
         if key not in buffer:
             buffer[key] = []
-        buffer[key] = data + buffer[key]
+        buffer[key] = buffer[key] + data
         self.local_storage.set(SNF_BUFFER, buffer)
 
         # Write data in buffer
@@ -272,7 +276,11 @@ class Connection(ABC):
             buffer[key] = []
             self.local_storage.set(SNF_BUFFER, buffer)
 
-    async def _flush_store_and_forward_buffer(self, key, data=None):
+    async def _flush_buffer(self, key, data=None):
+        if not self.store_and_forward:
+            await self._write(key, data)
+            return
+
         buffer = self.local_storage.get(SNF_BUFFER, {})
 
         # Add new data to buffer and save
