@@ -1,19 +1,11 @@
-"""
-Different ways to store key:value pairs on the local storage
-"""
-
 import pickle
 import json
 
 
-# ===================================================================================
-# Parent Class
-# ===================================================================================
 class LocalStorage:
-    # Predefined keys
-    SNF_BUFFER = "_snf_buffer"
-    LAST_TIME_READ = "_last_time"
-    PAST_VALUES = "_past_values"
+    """
+    In-memory storage
+    """
 
     def __init__(self):
         self.data = {}
@@ -23,7 +15,8 @@ class LocalStorage:
         pass
 
     def get(self, key, null_value=None):
-        if key not in self.data: return null_value
+        if key not in self.data:
+            return null_value
         return self.data[key]
 
     def set(self, key, value):
@@ -31,10 +24,10 @@ class LocalStorage:
         return value
 
 
-# ===================================================================================
-# File Storage
-# ===================================================================================
 class FileLocalStorage(LocalStorage):
+    """
+    Local Storage that uses pickle and saves data to a local file
+    """
 
     def __init__(self, file):
         self.file = file
@@ -57,6 +50,9 @@ class FileLocalStorage(LocalStorage):
 
 
 class JsonLocalStorage(LocalStorage):
+    """
+    Local Storage that saves data to a JSON file
+    """
     def __init__(self, file):
         self.file = file
         super().__init__()
@@ -77,10 +73,10 @@ class JsonLocalStorage(LocalStorage):
         return value
 
 
-# ===================================================================================
-# Sqlite Dict Storage (Uses pickle and sqlite)
-# ===================================================================================
 class SqliteDictLocalStorage(LocalStorage):
+    """
+    Local Storage that uses pickle and sqlite
+    """
 
     def __init__(self, file):
         self.file = file
@@ -104,6 +100,9 @@ class SqliteDictLocalStorage(LocalStorage):
 # Redis Storage
 # ===================================================================================
 class RedisLocalStorage(LocalStorage):
+    """
+    Local Storage that uses redis
+    """
 
     def __init__(self, prefix=""):
         self.red = None

@@ -4,7 +4,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 
-def parse_date_to_timestamp(date) -> int:
+def parse_date_to_timestamp(date: any) -> int:
     """Takes a date in multiple formats and returns the equivalent timestamp"""
     if isinstance(date, int) or isinstance(date, float):
         if date < 315360000:  # Sunday, December 30, 1979
@@ -19,7 +19,7 @@ def parse_date_to_timestamp(date) -> int:
         raise Exceptions.InvalidDate()
 
 
-def timestamp_to_string(timestamp, timezone="UTC", date_format="%Y-%m-%d %H:%M:%S") -> str:
+def timestamp_to_string(timestamp: int, timezone: str = "UTC", date_format: str = "%Y-%m-%d %H:%M:%S") -> str:
     """Takes a unix timestamp in seconds and returns a string"""
     date = datetime.utcfromtimestamp(timestamp).replace(tzinfo=ZoneInfo("UTC"))
     if timezone != "UTC":

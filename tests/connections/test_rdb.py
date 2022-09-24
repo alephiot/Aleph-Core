@@ -9,11 +9,12 @@ from tests.context.models import TestModelA
 NOW = time.time()
 
 
-class RDBConnectionTest(TestCase):
+class DBTestConnection(RDBConnection):
+    url = "sqlite:///test.db"
+    models = {"test.key": TestModelA}
 
-    class TestConnection(RDBConnection):
-        url = "sqlite:///test.db"
-        models = {"test.key": TestModelA}
+
+class RDBConnectionTest(TestCase):
 
     def setUp(self):
         pass
@@ -21,10 +22,9 @@ class RDBConnectionTest(TestCase):
     def tearDown(self):
         if os.path.isfile("test.db"):
             os.remove("test.db")
-        pass
 
     def test_read_write(self):
-        conn = RDBConnectionTest.TestConnection()
+        conn = DBTestConnection()
         conn.open()
 
         # Write

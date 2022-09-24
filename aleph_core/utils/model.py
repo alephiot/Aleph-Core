@@ -1,16 +1,20 @@
 """
-
+TODO
 """
 
-from sqlmodel import SQLModel, Field
+from pydantic import BaseModel, Field
 from typing import Optional
 from uuid import uuid4
 
 from aleph_core.utils.datetime_functions import now
 
 
-class Model(SQLModel):
-    id_: Optional[str] = Field(default_factory=lambda: str(uuid4()), primary_key=True, index=True)
+def generate_id():
+    return str(uuid4())
+
+
+class Model(BaseModel):
+    id_: Optional[str] = Field(default_factory=generate_id, primary_key=True, index=True)
     t: Optional[int] = Field(default_factory=now, index=True)
 
     # Associated key
