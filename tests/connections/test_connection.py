@@ -2,11 +2,9 @@ import random
 import time
 
 from unittest import TestCase
-from pydantic import ValidationError
 
 from aleph_core import Connection
 from aleph_core import Model
-from aleph_core import Exceptions
 
 
 class TestModel(Model):
@@ -25,6 +23,12 @@ class CaughtWriteException(Exception):
 
 
 class TestConnection(Connection):
+    connected = False
+    force_close = False
+
+    connection_events = []
+    time_step = 1
+
     random.seed(1)
     models = {"A": TestModel}
 
@@ -73,6 +77,26 @@ class TestConnection(Connection):
         elif key == "D":
             self.d += 1
             return self.sequence_c[self.d]
+
+    def open(self):
+        if self.force_close:
+            raise Exception("Could not open")
+
+        self.connection_events.append("open")
+        self.connected = True
+
+    def close(self):
+        self.connection_events.append("close")
+        self.connected = False
+
+    def is_open(self):
+        return self.connected
+
+    def on_connect(self):
+        self.connection_events.append("on_connect")
+
+    def on_disconnect(self):
+        self.connection_events.append("on_disconnect")
 
     def write(self, key, data):
         if key == "X":
@@ -224,3 +248,22 @@ class ConnectionTestCase(TestCase):
         _data = self.conn.written_values.get("Y")
         self.assertTrue(len(_data), 1)
         self.assertTrue(_data[0].get("a"), 3)
+
+    def test_connection_events(self):
+        self.conn.connection_events.clear()
+
+        self.conn.open_async()
+        time.sleep(3)
+
+        self.conn.close()
+        self.conn.force_close = True
+        time.sleep(3)
+
+        self.conn.force_close = False
+        time.sleep(3)
+
+        self.assertEqual(
+            self.conn.connection_events,
+            ['on_connect', 'close', 'on_disconnect', 'open', 'on_connect']
+        )
+

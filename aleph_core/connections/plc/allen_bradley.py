@@ -12,11 +12,15 @@ class AllenBradleyModels(Enum):
 
 
 class AllenBradleyConnection(Connection):
-    ip_address: str = "192.168.10.10"
+    """
+    Connect to an Allen Bradley PLC
+    """
+
+    ip_address = "localhost"
     controller: AllenBradleyModels = AllenBradleyModels.MicroLogix
+    plc = None
 
     report_by_exception = True
-    plc = None
 
     def open(self):
         if self.controller in [
@@ -58,7 +62,8 @@ class AllenBradleyConnection(Connection):
         tag = key
 
         # tag = X:I{L}
-        if "{" not in tag: tag = tag + "{1}"
+        if "{" not in tag:
+            tag = tag + "{1}"
         tag_ = tag.split(":")
         X = tag_[0]
         tag_ = tag_[1].replace("}", "").split("{")

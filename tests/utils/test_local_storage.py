@@ -4,12 +4,6 @@ from aleph_core.utils.local_storage import *
 
 class LocalStorageTestCase(TestCase):
 
-    def setUp(self):
-        pass
-
-    def tearDown(self):
-        pass
-
     def generic_test(self, local_storage: LocalStorage):
         local_storage.load()
         local_storage.set("A", "value")
@@ -29,4 +23,3 @@ class LocalStorageTestCase(TestCase):
 
     def test_redis_local_storage(self):
         pass
-

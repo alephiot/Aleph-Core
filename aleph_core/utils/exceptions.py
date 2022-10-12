@@ -25,19 +25,27 @@ class Error:
         self.exception = exception
         self.args = kwargs
 
+    @property
+    def title(self):
+        return repr(self.exception)
+
+    @property
     def message(self):
         args_str = "".join([str(x).title() + ": " + str(self.args[x]) + "\n" for x in self.args])
         if args_str != "": return repr(self.exception) + "\n" + args_str
         return repr(self.exception)
 
+    @property
     def traceback(self):
         return traceback.format_exc()
 
+    @property
     def message_and_traceback(self):
-        return self.message() + "\n\n" + self.traceback()
+        return self.message + "\n\n" + self.traceback
 
+    @property
     def raise_exception(self):
         raise self.exception
 
     def __str__(self):
-        return self.message_and_traceback()
+        return self.message_and_traceback
