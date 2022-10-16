@@ -54,7 +54,7 @@ class RDBTestCase(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        pass # cls.delete_file(FILE)
+        cls.delete_file(FILE)
 
     @staticmethod
     def delete_file(file):
