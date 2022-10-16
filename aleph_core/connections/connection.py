@@ -10,7 +10,7 @@ from aleph_core.utils.datetime_functions import parse_date_to_timestamp
 from aleph_core.utils.model import generate_id, Model
 from aleph_core.utils.report_by_exception import ReportByExceptionHelper
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 from abc import ABC
 import threading
 import asyncio
@@ -22,7 +22,7 @@ SNF_BUFFER = "SNF_BUFFER"
 
 
 class Connection(ABC):
-    models: dict[str, type(Model)] = {}
+    models: Union[dict[str, type(Model)], List[type(Model)]] = {}
     time_step = 10
 
     local_storage = LocalStorage()
@@ -35,6 +35,9 @@ class Connection(ABC):
         self.__async_loop__ = None
         self.__subscribed_keys__ = set()
         self.__report_by_exception_helpers__: dict[str, ReportByExceptionHelper] = {}
+
+        if isinstance(self.models, list):
+            self.models = {model.__key__: model for model in self.models}
 
     def open(self):
         """
@@ -97,6 +100,13 @@ class Connection(ABC):
         Callback function for when the connection is closed
         """
         return
+
+    def __enter__(self):
+        self.open()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
     def __run_on_async_thread__(self, coroutine):
         if self.__async_loop__ is None:
@@ -338,7 +348,7 @@ class Connection(ABC):
         cleaned_data = []
         for record in data:
             if model is not None:
-                record = model(**record)
+                record = dict(model(**record))
             else:
                 if "t" not in record:
                     record["t"] = now()

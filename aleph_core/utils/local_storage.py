@@ -25,9 +25,7 @@ class LocalStorage:
 
 
 class FileLocalStorage(LocalStorage):
-    """
-    Local Storage that uses pickle and saves data to a local file
-    """
+
 
     def __init__(self, file):
         self.file = file
@@ -96,9 +94,6 @@ class SqliteDictLocalStorage(LocalStorage):
         return value
 
 
-# ===================================================================================
-# Redis Storage
-# ===================================================================================
 class RedisLocalStorage(LocalStorage):
     """
     Local Storage that uses redis

@@ -1,21 +1,20 @@
-"""
-TODO
-"""
+import pydantic
+import sqlmodel
 
-from sqlmodel import SQLModel as BaseModel, Field
-from typing import Optional
+from typing import Optional, Dict
 from uuid import uuid4
 
 from aleph_core.utils.datetime_functions import now
+from aleph_core.utils.exceptions import Exceptions
 
 
 def generate_id():
     return str(uuid4())
 
 
-class Model(BaseModel):
-    id_: Optional[str] = Field(default_factory=generate_id, primary_key=True, index=True)
-    t: Optional[int] = Field(default_factory=now, index=True)
+class Model(pydantic.BaseModel):
+    id_: Optional[str] = None
+    t: Optional[int] = pydantic.Field(default_factory=now, index=True)
 
     # Associated key
     __key__ = None
@@ -29,9 +28,22 @@ class Model(BaseModel):
         self.__key__ = value
 
     @classmethod
-    def validate(cls, record_as_dict):
-        cls.parse_obj(record_as_dict)
+    def to_table_model(cls):
+        return type("TestTable", (TableModel, cls), {}, table=True)
+
+    @classmethod
+    def validate(cls, record_as_dict: Dict):
+        """Receives a dict and checks if it matches the model, otherwise it throws an InvalidModel error"""
+        try:
+            cls.parse_obj(record_as_dict)
+        except pydantic.ValidationError as validation_error:
+            raise Exceptions.InvalidModel(str(validation_error))
 
     def update(self, **kwargs):
         for field in kwargs:
             setattr(self, field, kwargs[field])
+
+
+class TableModel(sqlmodel.SQLModel):
+    id_: Optional[int] = sqlmodel.Field(default=None, primary_key=True)
+    __table_args__ = {'extend_existing': True}

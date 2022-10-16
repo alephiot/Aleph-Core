@@ -39,5 +39,8 @@ class MosquittoContainer(DockerContainer):
     IMAGE = "eclipse-mosquitto:2.0"
     COMMAND = "mosquitto -c /mosquitto-no-auth.conf"
     PORTS = {1883: 1883}
-    WAIT_SECONDS = 5
 
+
+class RedisContainer(DockerContainer):
+    IMAGE = "redis"
+    PORTS = {6379: 6379}

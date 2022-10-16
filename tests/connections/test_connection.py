@@ -134,11 +134,11 @@ class ConnectionTestCase(TestCase):
         self.assertEqual(len(data), 4)
 
     def test_write(self):
-        self.conn.write("A", {"a": "test"})
-        self.assertEqual(self.conn.written_values.get("A"), {"a": "test"})
+        self.conn.write("A", [{"a": "test"}])
+        self.assertEqual(self.conn.written_values.get("A"), [{"a": "test"}])
 
-        self.conn.write("B", {"b": "test"})
-        self.assertEqual(self.conn.written_values.get("B"), {"b": "test"})
+        self.conn.write("B", [{"b": "test"}])
+        self.assertEqual(self.conn.written_values.get("B"), [{"b": "test"}])
 
     def test_safe_read(self):
         data = self.conn.safe_read("A")
@@ -163,6 +163,26 @@ class ConnectionTestCase(TestCase):
             self.conn.safe_write("Z", {"a": "test"})
         except Exception as e:
             raise
+
+        test_record = {
+            "a": "hello",
+            "b": 1,
+            "c": 2.5,
+            "d": False,
+        }
+        self.conn.safe_write("A", [test_record])
+        written_record = self.conn.written_values.get("A")[-1]
+        self.assertTrue(all([test_record[r] == written_record[r] for r in test_record]))
+
+        altered_record = {
+            "a": "hello",
+            "b": "1",
+            "c": "2.5",
+            "d": "False",
+        }
+        self.conn.safe_write("A", [altered_record])
+        written_record = self.conn.written_values.get("A")[-1]
+        self.assertTrue(all([test_record[r] == written_record[r] for r in test_record]))
 
         self.conn.safe_write("B", {"b": "test"})
         self.assertTrue("t" in self.conn.written_values.get("B")[0])

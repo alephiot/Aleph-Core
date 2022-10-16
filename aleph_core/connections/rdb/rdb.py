@@ -1,7 +1,8 @@
-from aleph_core import Connection
-from aleph_core import Exceptions
 import sqlalchemy
 import sqlmodel
+
+from aleph_core import Connection
+from aleph_core import Exceptions
 
 
 class RDBConnection(Connection):
@@ -10,8 +11,13 @@ class RDBConnection(Connection):
 
     def __init__(self, client_id=""):
         super().__init__(client_id)
+        self.__tables__ = {}
+
         if len(self.models) == 0:
             raise Exception("The Relational Database needs models to work properly")
+
+        for key in self.models:
+            self.__tables__[key] = self.models[key].to_table_model()
 
     def open(self):
         if self.__engine__ is not None:
@@ -20,12 +26,16 @@ class RDBConnection(Connection):
         sqlmodel.SQLModel.metadata.create_all(self.__engine__)
 
     def close(self):
-        if self.__engine__ is None:
-            return
-        self.__engine__ = None
+        if self.__engine__ is not None:
+            self.__engine__ = None
 
     def is_open(self):
         return self.__engine__ is not None
+
+    def get_session(self):
+        if self.__engine__ is None:
+            self.open()
+        return sqlmodel.Session(self.__engine__)
 
     def run_sql_query(self, query):
         with sqlmodel.Session(self.__engine__) as session:
@@ -39,13 +49,13 @@ class RDBConnection(Connection):
         return result
 
     def read(self, key, **kwargs):
-        if key not in self.models:
+        if key not in self.__tables__:
             return None
 
         if self.__engine__ is None:
             raise Exceptions.ConnectionNotOpen()
 
-        model = self.models.get(key)
+        table = self.__tables__.get(key)
 
         since = kwargs.get("since", None)
         until = kwargs.get("until", None)
@@ -57,20 +67,21 @@ class RDBConnection(Connection):
         result = []
 
         with sqlmodel.Session(self.__engine__) as session:
-            statement = session.query(model)
+            statement = session.query(table)
 
-            if since: statement = statement.filter(getattr(model, "t") >= since)
-            if until: statement = statement.filter(getattr(model, "t") < until)
+            if since: statement = statement.filter(getattr(table, "t") >= since)
+            if until: statement = statement.filter(getattr(table, "t") < until)
             if offset: statement = statement.offset(offset)
             if limit: statement = statement.limit(limit)
 
             if order:
                 if order[0] == "-":
-                    statement = statement.order_by(getattr(model, order[1:]).desc())
+                    statement = statement.order_by(getattr(table, order[1:]).desc())
                 else:
-                    statement = statement.order_by(getattr(model, order).asc())
+                    statement = statement.order_by(getattr(table, order).asc())
 
             if where:
+                # TODO
                 pass
 
             all_instances = statement.all()
@@ -80,22 +91,25 @@ class RDBConnection(Connection):
         return result
 
     def write(self, key, data):
-        if key not in self.models:
+        if key not in self.__tables__:
             return None
 
         if self.__engine__ is None:
             raise Exceptions.ConnectionNotOpen()
 
-        model = self.models.get(key)
+        table = self.__tables__.get(key)
 
         with sqlmodel.Session(self.__engine__) as session:
             for record in data:
-                instance = session.query(model).get(record.get("id_"))
+                instance = session.query(table).get(record.get("id_"))
                 if instance is None:
-                    instance = model(**record)
+                    instance = table(**record)
                 else:
                     instance.update(**record)
 
                 session.add(instance)
             session.commit()
 
+
+class SQLFilterParser:
+    pass

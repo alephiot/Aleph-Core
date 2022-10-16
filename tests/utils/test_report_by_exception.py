@@ -3,7 +3,6 @@ from aleph_core.utils.report_by_exception import ReportByExceptionHelper
 
 
 class ReportByExceptionTestCase(TestCase):
-    # TODO: Fix compare method
 
     def test_report_by_exception_with_ids(self):
         R = ReportByExceptionHelper()

@@ -6,7 +6,10 @@ from unittest import TestCase
 from aleph_core.connections.rdb import RDBConnection
 from aleph_core import Model
 
+
 NOW = time.time()
+FILE = "test.db"
+KEY = "test.key"
 
 
 class TestEnum(str, Enum):
@@ -14,7 +17,9 @@ class TestEnum(str, Enum):
     option_2 = "B"
 
 
-class TestModel(Model, table=True):
+class TestModel(Model):
+    __key__ = KEY
+
     a: int
     b: str
     c: TestEnum = TestEnum.option_2
@@ -37,44 +42,78 @@ class TestModel(Model, table=True):
 
 
 class TestConnection(RDBConnection):
-    url = "sqlite:///test.db"
-    models = {"test.key": TestModel}
+    url = f"sqlite:///{FILE}"
+    models = [TestModel]
 
 
 class RDBTestCase(TestCase):
 
-    def setUp(self):
-        pass
+    @classmethod
+    def setUp(cls):
+        cls.delete_file(FILE)
 
-    def tearDown(self):
-        # if os.path.isfile("test.db"):
-        #     os.remove("test.db")
-        pass
+    @classmethod
+    def tearDownClass(cls):
+        pass # cls.delete_file(FILE)
+
+    @staticmethod
+    def delete_file(file):
+        if os.path.isfile(file):
+            os.remove(file)
 
     def test_read_write(self):
         conn = TestConnection()
         conn.open()
 
         # Write
-        conn.write("test.key", TestModel.samples())
+        records = TestModel.samples()
+        conn.write(KEY, records)
 
         # Read
-        a = conn.read("test.key", limit=1)
+        a = conn.read(KEY, limit=1)
         self.assertEqual(len(a), 1)
 
-        b = conn.read("test.key", limit=1, offset=1)
+        b = conn.read(KEY, limit=1, offset=1)
         self.assertEqual(len(b), 1)
         self.assertNotEqual(a[0]["id_"], b[0]["id_"])
 
-        c = conn.read("test.key", since=NOW - 50)
+        c = conn.read(KEY, since=NOW - 50)
         self.assertEqual(len(c), 3)
 
-        d = conn.read("test.key", since=NOW - 50, until=NOW - 30)
+        d = conn.read(KEY,  since=NOW - 50, until=NOW - 30)
         self.assertEqual(len(d), 1)
 
-        e = conn.read("test.key", order="b")
-        f = conn.read("test.key", order="-b")
+        e = conn.read(KEY, order="b")
+        f = conn.read(KEY, order="-b")
         self.assertEqual(e[0], f[-1])
         self.assertEqual(e[-1], f[0])
 
         conn.close()
+
+    def test_run_sql(self):
+
+        with TestConnection() as conn:
+            records = TestModel.samples()
+            conn.write(KEY, records)
+
+            r = conn.run_sql_query("SELECT * FROM testtable")
+            self.assertIsNotNone(r)
+            self.assertEqual(len(r), 6)
+
+            r = conn.run_sql_query("DELETE FROM testtable")
+            self.assertIsNone(r)
+
+            r = conn.run_sql_query("SELECT * FROM testtable")
+            self.assertIsNotNone(r)
+            self.assertEqual(len(r), 0)
+
+        conn = TestConnection()
+        with conn.get_session() as session:
+            model = TestModel.to_table_model()
+            new_instance = model(a=1, b="hello", c=TestEnum.option_1)
+            session.add(new_instance)
+
+            self.assertIsNone(new_instance.id_)
+            session.flush()
+            self.assertIsNotNone(new_instance.id_)
+            session.commit()
