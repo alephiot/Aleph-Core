@@ -129,15 +129,3 @@ class RDSGenericTestCase(TestCase):
             self.assertIsNotNone(new_instance.id_)
             session.commit()
 
-
-class MariaDBTestCase(RDSGenericTestCase):
-    conn = MariaDBConnection
-    container = MariaDBContainer()
-
-    @classmethod
-    def setUpClass(cls):
-        cls.container.run()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.container.stop()
