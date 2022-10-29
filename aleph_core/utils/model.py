@@ -45,5 +45,7 @@ class Model(pydantic.BaseModel):
 
 
 class TableModel(sqlmodel.SQLModel):
-    id_: Optional[int] = sqlmodel.Field(default=None, primary_key=True)
+    id_: Optional[str] = sqlmodel.Field(default=None, primary_key=True)
+    delete_: Optional[bool] = sqlmodel.Field(default=False)
+
     __table_args__ = {'extend_existing': True}

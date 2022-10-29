@@ -5,7 +5,7 @@ from aleph_core import Connection
 from aleph_core import Exceptions
 
 
-class RDBConnection(Connection):
+class RDSConnection(Connection):
     url = ""
     __engine__ = None
 
@@ -69,10 +69,15 @@ class RDBConnection(Connection):
         with sqlmodel.Session(self.__engine__) as session:
             statement = session.query(table)
 
-            if since: statement = statement.filter(getattr(table, "t") >= since)
-            if until: statement = statement.filter(getattr(table, "t") < until)
-            if offset: statement = statement.offset(offset)
-            if limit: statement = statement.limit(limit)
+            if since:
+                statement = statement.filter(getattr(table, "t") >= since)
+            if until:
+                statement = statement.filter(getattr(table, "t") < until)
+
+            if where:
+                # TODO
+                # statement = statement.where(getattr(table, order) == 1)
+                pass
 
             if order:
                 if order[0] == "-":
@@ -80,9 +85,10 @@ class RDBConnection(Connection):
                 else:
                     statement = statement.order_by(getattr(table, order).asc())
 
-            if where:
-                # TODO
-                pass
+            if offset:
+                statement = statement.offset(offset)
+            if limit:
+                statement = statement.limit(limit)
 
             all_instances = statement.all()
             for instance in all_instances:
@@ -109,7 +115,3 @@ class RDBConnection(Connection):
 
                 session.add(instance)
             session.commit()
-
-
-class SQLFilterParser:
-    pass

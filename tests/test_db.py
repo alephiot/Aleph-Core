@@ -3,12 +3,13 @@ import os
 from enum import Enum
 from unittest import TestCase
 
-from aleph_core.connections.rdb import RDBConnection
+from utils.docker import MariaDBContainer
+
+from aleph_core.connections.db.rds import RDSConnection
 from aleph_core import Model
 
 
 NOW = time.time()
-FILE = "test.db"
 KEY = "test.key"
 
 
@@ -41,20 +42,30 @@ class TestModel(Model):
         return [x.dict() for x in samples]
 
 
-class TestConnection(RDBConnection):
+class SQLiteConnection(RDSConnection):
+    FILE = "test.db"
     url = f"sqlite:///{FILE}"
     models = [TestModel]
 
 
-class RDBTestCase(TestCase):
+class MariaDBConnection(RDSConnection):
+    user = "user"
+    password = "1234"
+    db = "main"
+    url = f"mysql+pymysql://{user}:{password}@localhost/{db}?charset=utf8mb4"
+    models = [TestModel]
+
+
+class RDSGenericTestCase(TestCase):
+    conn = SQLiteConnection
 
     @classmethod
-    def setUp(cls):
-        cls.delete_file(FILE)
+    def setUpClass(cls):
+        cls.delete_file(cls.conn.FILE)
 
     @classmethod
     def tearDownClass(cls):
-        cls.delete_file(FILE)
+        cls.delete_file(cls.conn.FILE)
 
     @staticmethod
     def delete_file(file):
@@ -62,7 +73,7 @@ class RDBTestCase(TestCase):
             os.remove(file)
 
     def test_read_write(self):
-        conn = TestConnection()
+        conn = self.conn()
         conn.open()
 
         # Write
@@ -92,7 +103,7 @@ class RDBTestCase(TestCase):
 
     def test_run_sql(self):
 
-        with TestConnection() as conn:
+        with self.conn() as conn:
             records = TestModel.samples()
             conn.write(KEY, records)
 
@@ -107,7 +118,7 @@ class RDBTestCase(TestCase):
             self.assertIsNotNone(r)
             self.assertEqual(len(r), 0)
 
-        conn = TestConnection()
+        conn = self.conn()
         with conn.get_session() as session:
             model = TestModel.to_table_model()
             new_instance = model(a=1, b="hello", c=TestEnum.option_1)
@@ -117,3 +128,16 @@ class RDBTestCase(TestCase):
             session.flush()
             self.assertIsNotNone(new_instance.id_)
             session.commit()
+
+
+class MariaDBTestCase(RDSGenericTestCase):
+    conn = MariaDBConnection
+    container = MariaDBContainer()
+
+    @classmethod
+    def setUpClass(cls):
+        cls.container.run()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.container.stop()

@@ -9,6 +9,7 @@ class DockerContainer(ABC):
     COMMAND: str = None
     VOLUMES = {}
     PORTS = {}
+    ENVIRONMENT = {}
     WAIT_SECONDS = 5
 
     def __init__(self):
@@ -25,6 +26,7 @@ class DockerContainer(ABC):
             detach=True,
             volumes=self.VOLUMES,
             ports=self.PORTS,
+            environment=self.ENVIRONMENT,
         )
 
         if self.WAIT_SECONDS:
@@ -44,3 +46,9 @@ class MosquittoContainer(DockerContainer):
 class RedisContainer(DockerContainer):
     IMAGE = "redis"
     PORTS = {6379: 6379}
+
+
+class MariaDBContainer(DockerContainer):
+    IMAGE = "mariadb"
+    PORTS = {3306: 3306}
+    ENVIRONMENT = {"MARIADB_USER": "user", "MARIADB_PASSWORD": "1234", "MYSQL_DATABASE": "main"}

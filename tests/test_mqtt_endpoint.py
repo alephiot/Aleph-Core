@@ -51,6 +51,8 @@ class ServiceTestCase(TestCase):
         RECEIVED_MESSAGE = message
 
     def test_endpoint(self):
+        global RECEIVED_MESSAGE
+
         test_endpoint = TestEndpoint()
         threading.Thread(target=test_endpoint.run, daemon=True).start()
 
