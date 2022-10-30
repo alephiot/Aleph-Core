@@ -77,6 +77,8 @@ class RDSGenericTestCase(TestCase):
         # Read
         a = conn.read(KEY, limit=1)
         self.assertEqual(len(a), 1)
+        self.assertTrue("deleted_" not in a[0])
+        self.assertTrue("_id" not in a[0])
 
         b = conn.read(KEY, limit=1, offset=1)
         self.assertEqual(len(b), 1)
@@ -101,22 +103,9 @@ class RDSGenericTestCase(TestCase):
         self.assertEqual(len(g), 2)
         g = conn.read(KEY, filter={"a": 5})
         self.assertEqual(len(g), 1)
-        g = conn.read(KEY, filter={"a": "==5"})
-        self.assertEqual(len(g), 1)
         g = conn.read(KEY, filter={"a": 12})
         self.assertEqual(len(g), 0)
-        g = conn.read(KEY, filter={"a": "!=5"})
-        self.assertEqual(len(g), 5)
-        g = conn.read(KEY, filter={"a": ">=5"})
-        self.assertEqual(len(g), 2)
-        g = conn.read(KEY, filter={"a": "<=5"})
-        self.assertEqual(len(g), 5)
-        g = conn.read(KEY, filter={"a": "<5"})
-        self.assertEqual(len(g), 4)
-        g = conn.read(KEY, filter={"a": ">5"})
-        self.assertEqual(len(g), 1)
-        g = conn.read(KEY, filter={"a": ">1"})
-        self.assertEqual(len(g), 5)
+        # TODO
 
         conn.close()
 
@@ -152,7 +141,6 @@ class RDSGenericTestCase(TestCase):
         conn = self.conn()
         id_ = "item0"
 
-        records = TestModel.samples()
         conn.safe_write(KEY, TestModel(a=8, b="x", c=TestEnum.option_2, id_=id_))
         self.assertEqual(len(conn.read(KEY)), 1)
 
@@ -160,7 +148,10 @@ class RDSGenericTestCase(TestCase):
         self.assertEqual(len(conn.read(KEY)), 0)
 
         conn.safe_write(KEY, {"id_": id_, "deleted_": False})
-        self.assertEqual(len(conn.read(KEY)), 1)
+        r = conn.read(KEY)
+        self.assertEqual(len(r), 1)
+        self.assertTrue("deleted_" not in r[0])
+        self.assertTrue("_id" not in r[0])
 
         conn.delete(KEY, id_)
         self.assertEqual(len(conn.read(KEY)), 0)

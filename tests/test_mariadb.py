@@ -21,6 +21,12 @@ class MariaDBConnection(RDSConnection):
             table = self.__tables__[table].__table__
             self.run_sql_query(f"DROP TABLE {table};")
 
+    def on_read_error(self, error):
+        error.raise_exception()
+
+    def on_write_error(self, error):
+        error.raise_exception()
+
 
 class MariaDBTestCase(RDSGenericTestCase):
     conn = MariaDBConnection

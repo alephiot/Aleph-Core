@@ -90,9 +90,11 @@ class RDSConnection(Connection):
             if limit:
                 statement = statement.limit(limit)
 
-            all_instances = statement.all()
-            for instance in all_instances:
-                result.append(instance.dict())
+            records = statement.all()
+            for record in records:
+                record = record.dict()
+                record.pop("deleted_", None)
+                result.append(record)
 
         return result
 
@@ -120,6 +122,7 @@ class RDSConnection(Connection):
             session.commit()
 
     def delete(self, key, id_):
+        # TODO
         self.write(key, [{"id_": id_, "deleted_": True}])
 
     def __filter_statement__(self, table, statement, where):

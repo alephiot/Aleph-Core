@@ -49,21 +49,22 @@ class MongoDBConnection(Connection):
         order = kwargs.get("order", None)
         where = kwargs.get("filter", None)
 
-        filters = [{"deleted_": False}]
+        filters = [{"deleted_": {"$ne": True}}]
 
         if since and until:
             filters.append({"t": {"$gte": since, "$lte": until}})
         elif since and not until:
             filters.append({"t": {"$gte": since}})
         elif not since and until:
-            filters.append({"t": {"$lte": until}})
+            filters.append({"t": {"$lt": until}})
 
         if where:
-            # TODO
-            pass
+            filters.append(self.__deparse_filter__(where))
+
+        projection = {"_id": False, "deleted_": False}
 
         collection = self.get_collection(key)
-        result = collection.find({"$and": filters}, limit=limit, skip=offset)
+        result = collection.find({"$and": filters}, projection=projection, limit=limit, skip=offset)
 
         if order:
             if order[0] == "-":
@@ -76,13 +77,17 @@ class MongoDBConnection(Connection):
     def write(self, key, data):
         collection = self.get_collection(key)
         for record in data:
-            if "id_" in record:
+            if "id_" in record and record["id_"]:
                 collection.update_one({"id_": record["id_"]}, {
                     "$set": record,
-                    "$setOnInsert": {"deleted_": False},
+                    # "$setOnInsert": {"deleted_": False},
                 }, upsert=True)
             else:
                 collection.insert_one(record)
+
+    def delete(self, key, id_):
+        # TODO
+        self.write(key, [{"id_": id_, "deleted_": True}])
 
     def get_collection(self, key) -> pymongo.collection.Collection:
         if key in self.models:
@@ -92,17 +97,38 @@ class MongoDBConnection(Connection):
 
         return self.client[self.database][key]
 
-    def deparse_filter(self, filter_):
-        """
-        Gets a filter
-        """
-        if isinstance(filter_, str):
-            filter_ = json.loads(filter_)
+    def __deparse_filter__(self, where):
+        if isinstance(where, str):
+            where = json.loads(where)
 
-        filters = []
+        if not isinstance(where, dict):
+            raise Exception("Filter needs to be a dict")
 
+        return {"$and": self.__filter_to_conditions__(where)}
 
+    def __filter_to_conditions__(self, where):
+        # TODO
+        conditions = []
+        for field in where:
+            condition = where[field]
 
+            if isinstance(condition, list):
+                conditions.append({field: {"$in": condition}})
+            elif isinstance(condition, float) or isinstance(condition, int):
+                conditions.append({field: condition})
+            elif condition.startswith("=="):
+                conditions.append({field: condition[2:]})
+            elif condition.startswith("!="):
+                conditions.append({field: {"$ne": condition[2:]}})
+            elif condition.startswith(">="):
+                conditions.append({field: {"$gte": condition[2:]}})
+            elif condition.startswith("<="):
+                conditions.append({field: {"$lte": condition[2:]}})
+            elif condition.startswith(">"):
+                conditions.append({field: {"$gt": condition[1:]}})
+            elif condition.startswith("<"):
+                conditions.append({field: {"$lt": condition[1:]}})
+            else:
+                conditions.append({field: condition})
 
-
-
+        return conditions

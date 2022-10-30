@@ -13,7 +13,7 @@ def generate_id():
 
 
 class Model(pydantic.BaseModel):
-    id_: Optional[str] = None
+    id_: Optional[str] = pydantic.Field(default_factory=generate_id, index=True)
     t: Optional[int] = pydantic.Field(default_factory=now, index=True)
 
     __key__: str = None

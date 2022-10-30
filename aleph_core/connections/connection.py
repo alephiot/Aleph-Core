@@ -350,7 +350,7 @@ class Connection(ABC):
             if not isinstance(record, dict):
                 record = dict(record)
 
-            deleted = record.get("deleted_", None)
+            deleted = record.pop("deleted_", None)
             if model is not None:
                 record = dict(model(**record))
             else:
