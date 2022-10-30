@@ -18,7 +18,8 @@ class MariaDBConnection(RDSConnection):
 
     def drop_all(self):
         for table in self.__tables__:
-            self.run_sql_query(f"DROP {table.__table__}")
+            table = self.__tables__[table].__table__
+            self.run_sql_query(f"DROP TABLE {table};")
 
 
 class MariaDBTestCase(RDSGenericTestCase):
@@ -27,16 +28,20 @@ class MariaDBTestCase(RDSGenericTestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.container.run()
+        pass#cls.container.run()
 
     @classmethod
     def tearDownClass(cls):
-        cls.container.stop()
+        pass#cls.container.stop()
 
     def setUp(self):
-        conn = self.conn().open()
+        conn = self.conn()
+        conn.open()
         conn.drop_all()
+        pass
 
     def tearDown(self):
-        conn = self.conn().open()
+        conn = self.conn()
+        conn.open()
         conn.drop_all()
+        pass

@@ -134,6 +134,7 @@ class RDSConnection(Connection):
         return statement
 
     def __filter_to_conditions__(self, table, where: dict):
+        # TODO: Decide on filter
         conditions = []
         for field in where:
             condition = where[field]
