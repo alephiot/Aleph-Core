@@ -120,6 +120,7 @@ class RDSGenericTestCase(TestCase):
 
         conn.close()
 
+    """
     def test_run_sql(self):
 
         with self.conn() as conn:
@@ -164,3 +165,4 @@ class RDSGenericTestCase(TestCase):
 
         conn.delete(KEY, id_)
         self.assertEqual(len(conn.read(KEY)), 0)
+    """

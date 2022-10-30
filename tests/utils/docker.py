@@ -51,4 +51,14 @@ class RedisContainer(DockerContainer):
 class MariaDBContainer(DockerContainer):
     IMAGE = "mariadb"
     PORTS = {3306: 3306}
-    ENVIRONMENT = {"MARIADB_USER": "user", "MARIADB_PASSWORD": "1234", "MYSQL_DATABASE": "main"}
+    ENVIRONMENT = {
+        "MARIADB_USER": "user",
+        "MARIADB_PASSWORD": "1234",
+        "MARIADB_DATABASE": "main",
+        "MARIADB_ROOT_PASSWORD": "0000",
+    }
+
+
+class MongoDBContainer(DockerContainer):
+    IMAGE = "mongo"
+    PORTS = {27017: 27017}
