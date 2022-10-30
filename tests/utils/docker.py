@@ -51,6 +51,7 @@ class RedisContainer(DockerContainer):
 class MariaDBContainer(DockerContainer):
     IMAGE = "mariadb"
     PORTS = {3306: 3306}
+    WAIT_SECONDS = 7
     ENVIRONMENT = {
         "MARIADB_USER": "user",
         "MARIADB_PASSWORD": "1234",

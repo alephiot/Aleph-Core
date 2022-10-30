@@ -28,20 +28,18 @@ class MariaDBTestCase(RDSGenericTestCase):
 
     @classmethod
     def setUpClass(cls):
-        pass#cls.container.run()
+        cls.container.run()
 
     @classmethod
     def tearDownClass(cls):
-        pass#cls.container.stop()
+        cls.container.stop()
 
     def setUp(self):
         conn = self.conn()
         conn.open()
         conn.drop_all()
-        pass
 
     def tearDown(self):
         conn = self.conn()
         conn.open()
         conn.drop_all()
-        pass
