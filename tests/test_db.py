@@ -3,8 +3,6 @@ import os
 from enum import Enum
 from unittest import TestCase
 
-from utils.docker import MariaDBContainer
-
 from aleph_core.connections.db.rds import RDSConnection
 from aleph_core import Model
 
@@ -21,8 +19,8 @@ class TestEnum(str, Enum):
 class TestModel(Model):
     __key__ = KEY
 
-    a: int
-    b: str
+    a: int = None
+    b: str = None
     c: TestEnum = TestEnum.option_2
 
     @staticmethod
@@ -47,25 +45,21 @@ class SQLiteConnection(RDSConnection):
     url = f"sqlite:///{FILE}"
     models = [TestModel]
 
+    def on_read_error(self, error):
+        error.raise_exception()
 
-class MariaDBConnection(RDSConnection):
-    user = "user"
-    password = "1234"
-    db = "main"
-    url = f"mysql+pymysql://{user}:{password}@localhost/{db}?charset=utf8mb4"
-    models = [TestModel]
+    def on_write_error(self, error):
+        error.raise_exception()
 
 
 class RDSGenericTestCase(TestCase):
     conn = SQLiteConnection
 
-    @classmethod
-    def setUpClass(cls):
-        cls.delete_file(cls.conn.FILE)
+    def setUp(self):
+        self.delete_file(self.conn.FILE)
 
-    @classmethod
-    def tearDownClass(cls):
-        cls.delete_file(cls.conn.FILE)
+    def tearDown(self):
+        self.delete_file(self.conn.FILE)
 
     @staticmethod
     def delete_file(file):
@@ -99,6 +93,31 @@ class RDSGenericTestCase(TestCase):
         self.assertEqual(e[0], f[-1])
         self.assertEqual(e[-1], f[0])
 
+        g = conn.read(KEY, filter={"b": "zu"})
+        self.assertEqual(len(g), 1)
+        g = conn.read(KEY, filter={"b": "zz"})
+        self.assertEqual(len(g), 0)
+        g = conn.read(KEY, filter={"b": ["zu", "rr", "zz"]})
+        self.assertEqual(len(g), 2)
+        g = conn.read(KEY, filter={"a": 5})
+        self.assertEqual(len(g), 1)
+        g = conn.read(KEY, filter={"a": "==5"})
+        self.assertEqual(len(g), 1)
+        g = conn.read(KEY, filter={"a": 12})
+        self.assertEqual(len(g), 0)
+        g = conn.read(KEY, filter={"a": "!=5"})
+        self.assertEqual(len(g), 5)
+        g = conn.read(KEY, filter={"a": ">=5"})
+        self.assertEqual(len(g), 2)
+        g = conn.read(KEY, filter={"a": "<=5"})
+        self.assertEqual(len(g), 5)
+        g = conn.read(KEY, filter={"a": "<5"})
+        self.assertEqual(len(g), 4)
+        g = conn.read(KEY, filter={"a": ">5"})
+        self.assertEqual(len(g), 1)
+        g = conn.read(KEY, filter={"a": ">1"})
+        self.assertEqual(len(g), 1)
+
         conn.close()
 
     def test_run_sql(self):
@@ -107,21 +126,21 @@ class RDSGenericTestCase(TestCase):
             records = TestModel.samples()
             conn.write(KEY, records)
 
-            r = conn.run_sql_query("SELECT * FROM testtable")
+            r = conn.run_sql_query("SELECT * FROM testmodel")
             self.assertIsNotNone(r)
             self.assertEqual(len(r), 6)
 
-            r = conn.run_sql_query("DELETE FROM testtable")
+            r = conn.run_sql_query("DELETE FROM testmodel")
             self.assertIsNone(r)
 
-            r = conn.run_sql_query("SELECT * FROM testtable")
+            r = conn.run_sql_query("SELECT * FROM testmodel")
             self.assertIsNotNone(r)
             self.assertEqual(len(r), 0)
 
         conn = self.conn()
         with conn.get_session() as session:
             model = TestModel.to_table_model()
-            new_instance = model(a=1, b="hello", c=TestEnum.option_1)
+            new_instance = model(a=1, b="hello", c=TestEnum.option_1, id_=None)
             session.add(new_instance)
 
             self.assertIsNone(new_instance.id_)
@@ -129,3 +148,19 @@ class RDSGenericTestCase(TestCase):
             self.assertIsNotNone(new_instance.id_)
             session.commit()
 
+    def test_deleted(self):
+        conn = self.conn()
+        id_ = "item0"
+
+        records = TestModel.samples()
+        conn.safe_write(KEY, TestModel(a=8, b="x", c=TestEnum.option_2, id_=id_))
+        self.assertEqual(len(conn.read(KEY)), 1)
+
+        conn.safe_write(KEY, {"id_": id_, "deleted_": True})
+        self.assertEqual(len(conn.read(KEY)), 0)
+
+        conn.safe_write(KEY, {"id_": id_, "deleted_": False})
+        self.assertEqual(len(conn.read(KEY)), 1)
+
+        conn.delete(KEY, id_)
+        self.assertEqual(len(conn.read(KEY)), 0)

@@ -16,8 +16,8 @@ class Model(pydantic.BaseModel):
     id_: Optional[str] = None
     t: Optional[int] = pydantic.Field(default_factory=now, index=True)
 
-    # Associated key
-    __key__ = None
+    __key__: str = None
+    __table__ = None  # TODO Type??
 
     @property
     def key(self):
@@ -29,7 +29,9 @@ class Model(pydantic.BaseModel):
 
     @classmethod
     def to_table_model(cls):
-        return type("TestTable", (TableModel, cls), {}, table=True)
+        if cls.__table__ is None:
+            cls.__table__ = type(cls.__name__, (TableModel, cls), {}, table=True)
+        return cls.__table__
 
     @classmethod
     def validate(cls, record_as_dict: Dict):
@@ -46,6 +48,7 @@ class Model(pydantic.BaseModel):
 
 class TableModel(sqlmodel.SQLModel):
     id_: Optional[str] = sqlmodel.Field(default_factory=generate_id, primary_key=True)
-    delete_: Optional[bool] = sqlmodel.Field(default=False)
+    deleted_: Optional[bool] = sqlmodel.Field(default=False)
+    # TODO: Created?
 
     __table_args__ = {'extend_existing': True}

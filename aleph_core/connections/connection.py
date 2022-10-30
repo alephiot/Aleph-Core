@@ -347,6 +347,10 @@ class Connection(ABC):
 
         cleaned_data = []
         for record in data:
+            if not isinstance(record, dict):
+                record = dict(record)
+
+            deleted = record.get("deleted_", None)
             if model is not None:
                 record = dict(model(**record))
             else:
@@ -359,6 +363,8 @@ class Connection(ABC):
                 record = report_by_exception_helper.compare_record(record)
 
             if record:
+                if deleted is not None:
+                    record["deleted_"] = deleted
                 cleaned_data.append(record)
 
         return cleaned_data

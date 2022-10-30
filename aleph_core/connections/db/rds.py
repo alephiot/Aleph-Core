@@ -1,5 +1,6 @@
 import sqlalchemy
 import sqlmodel
+import json
 
 from aleph_core import Connection
 from aleph_core import Exceptions
@@ -68,6 +69,7 @@ class RDSConnection(Connection):
 
         with sqlmodel.Session(self.__engine__) as session:
             statement = session.query(table)
+            statement = statement.where(getattr(table, "deleted_") != True)
 
             if since:
                 statement = statement.filter(getattr(table, "t") >= since)
@@ -75,9 +77,7 @@ class RDSConnection(Connection):
                 statement = statement.filter(getattr(table, "t") < until)
 
             if where:
-                # TODO
-                # statement = statement.where(getattr(table, order) == 1)
-                pass
+                statement = self.__filter_statement__(table, statement, where)
 
             if order:
                 if order[0] == "-":
@@ -107,7 +107,10 @@ class RDSConnection(Connection):
 
         with sqlmodel.Session(self.__engine__) as session:
             for record in data:
-                instance = session.query(table).get(record.get("id_"))
+                instance = None
+                if "id_" in record and record["id_"]:
+                    instance = session.query(table).get(record["id_"])
+
                 if instance is None:
                     instance = table(**record)
                 else:
@@ -115,3 +118,44 @@ class RDSConnection(Connection):
 
                 session.add(instance)
             session.commit()
+
+    def delete(self, key, id_):
+        self.write(key, [{"id_": id_, "deleted_": True}])
+
+    def __filter_statement__(self, table, statement, where):
+        if isinstance(where, str):
+            where = json.loads(where)
+
+        if not isinstance(where, dict):
+            raise Exception("Filter needs to be a dict")
+
+        and_conditions = self.__filter_to_conditions__(table, where)
+        statement = statement.filter(sqlalchemy.and_(*and_conditions))
+        return statement
+
+    def __filter_to_conditions__(self, table, where: dict):
+        conditions = []
+        for field in where:
+            condition = where[field]
+            field = getattr(table, field)
+
+            if isinstance(condition, list):
+                conditions.append(field.in_(condition))
+            elif isinstance(condition, float) or isinstance(condition, int):
+                conditions.append(field == condition)
+            elif condition.startswith("=="):
+                conditions.append(field == condition[2:])
+            elif condition.startswith("!="):
+                conditions.append(field != condition[2:])
+            elif condition.startswith(">="):
+                conditions.append(field >= condition[2:])
+            elif condition.startswith("<="):
+                conditions.append(field <= condition[2:])
+            elif condition.startswith(">"):
+                conditions.append(field > condition[1:])
+            elif condition.startswith("<"):
+                conditions.append(field < condition[1:])
+            else:
+                conditions.append(field == condition)
+
+        return conditions
