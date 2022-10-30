@@ -139,6 +139,7 @@ class RDSGenericTestCase(TestCase):
 
     def test_deleted(self):
         conn = self.conn()
+        conn.open()
         id_ = "item0"
 
         conn.safe_write(KEY, TestModel(a=8, b="x", c=TestEnum.option_2, id_=id_))
@@ -155,3 +156,21 @@ class RDSGenericTestCase(TestCase):
 
         conn.delete(KEY, id_)
         self.assertEqual(len(conn.read(KEY)), 0)
+
+        conn.close()
+
+    def test_update(self):
+        conn = self.conn()
+        conn.open()
+        r = TestModel(b="x").dict()
+
+        conn.write(KEY, [r])
+        self.assertEqual(len(conn.read(KEY)), 1)
+        self.assertEqual(conn.read(KEY)[0]["b"], "x")
+
+        r["b"] = "w"
+        conn.write(KEY, [r])
+        self.assertEqual(len(conn.read(KEY)), 1)
+        self.assertEqual(conn.read(KEY)[0]["b"], "w")
+
+        conn.close()

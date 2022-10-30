@@ -286,4 +286,3 @@ class ConnectionTestCase(TestCase):
             self.conn.connection_events,
             ['on_connect', 'close', 'on_disconnect', 'open', 'on_connect']
         )
-

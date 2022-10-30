@@ -33,6 +33,10 @@ class Model(pydantic.BaseModel):
             cls.__table__ = type(cls.__name__, (TableModel, cls), {}, table=True)
         return cls.__table__
 
+    def to_dict(self):
+        return self.dict(exclude_none=True, exclude_defaults=True)
+
+
     @classmethod
     def validate(cls, record_as_dict: Dict):
         """Receives a dict and checks if it matches the model, otherwise it throws an InvalidModel error"""

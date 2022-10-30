@@ -15,7 +15,7 @@ class TestConnection(MongoDBConnection):
     models = [TestModel]
 
     def drop_all(self):
-        self.get_collection(self.database).drop()
+        self.client.drop_database(self.database)
 
     def on_read_error(self, error):
         error.raise_exception()

@@ -2,11 +2,11 @@ import time
 import json
 import threading
 from unittest import TestCase
+from utils.docker import MosquittoContainer
 
 from aleph_core import Connection
 from aleph_core.connections.namespace.mqtt import MqttNamespaceConnection
 from aleph_core.services.endpoint.mqtt import MqttEndpoint
-from aleph_core.utils.docker import MosquittoContainer
 from aleph_core.utils.mqtt_client import MqttClient
 
 
@@ -38,11 +38,9 @@ class ServiceTestCase(TestCase):
     def setUpClass(cls):
         cls.mosquitto_server.run()
         cls.mqtt_client.on_new_message = cls.mqtt_client_new_message
-        cls.mqtt_client.connect()
 
     @classmethod
     def tearDownClass(cls):
-        cls.mqtt_client.disconnect()
         cls.mosquitto_server.stop()
 
     @staticmethod
@@ -52,6 +50,8 @@ class ServiceTestCase(TestCase):
 
     def test_endpoint(self):
         global RECEIVED_MESSAGE
+
+        self.mqtt_client.connect()
 
         test_endpoint = TestEndpoint()
         threading.Thread(target=test_endpoint.run, daemon=True).start()
@@ -74,3 +74,5 @@ class ServiceTestCase(TestCase):
         expected_message.update(ARGS)
         expected_message.update(MESSAGE)
         self.assertEqual(msg["data"][0], expected_message)
+
+        self.mqtt_client.disconnect()
