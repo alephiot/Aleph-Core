@@ -6,7 +6,6 @@ from aleph_core.utils.local_storage import LocalStorage
 from aleph_core.utils.wait_one_step import WaitOneStep
 from aleph_core.utils.exceptions import Exceptions, Error
 from aleph_core.utils.datetime_functions import now
-from aleph_core.utils.datetime_functions import parse_date_to_timestamp
 from aleph_core.utils.model import generate_id, Model
 from aleph_core.utils.report_by_exception import ReportByExceptionHelper
 

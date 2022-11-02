@@ -62,7 +62,7 @@ class RDSConnection(Connection):
         until = kwargs.get("until", None)
         limit = kwargs.get("limit", None)
         offset = kwargs.get("offset", None)
-        order = kwargs.get("order", None)
+        order = kwargs.get("order", "-t")
         where = kwargs.get("filter", None)
 
         result = []
