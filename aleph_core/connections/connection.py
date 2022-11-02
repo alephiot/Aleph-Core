@@ -1,13 +1,10 @@
-"""
-
-"""
-
 from aleph_core.utils.local_storage import LocalStorage
 from aleph_core.utils.wait_one_step import WaitOneStep
 from aleph_core.utils.exceptions import Exceptions, Error
 from aleph_core.utils.datetime_functions import now
 from aleph_core.utils.model import generate_id, Model
 from aleph_core.utils.report_by_exception import ReportByExceptionHelper
+from aleph_core.utils.typing import Data, Record
 
 from typing import List, Dict, Any, Union
 from abc import ABC
@@ -21,7 +18,7 @@ SNF_BUFFER = "SNF_BUFFER"
 
 
 class Connection(ABC):
-    models: Union[dict[str, type(Model)], List[type(Model)]] = {}
+    models: Union[dict[str, Model], List[Model]] = {}
     time_step = 10
 
     local_storage = LocalStorage()
@@ -56,7 +53,7 @@ class Connection(ABC):
         """
         return []
 
-    def write(self, key: str, data: List[Dict[str, Any]]):
+    def write(self, key: str, data: Data):
         """
         Returns None.
         """
@@ -68,7 +65,7 @@ class Connection(ABC):
         """
         return True
 
-    def on_new_data(self, key: str, data: List[Dict[str, Any]]):
+    def on_new_data(self, key: str, data: Data):
         """
         Callback function for when a new message arrives. Data can be a dict or a list of
         dict. This function is used by the read_async, subscribe async and subscribe
@@ -247,7 +244,7 @@ class Connection(ABC):
             self.on_read_error(Error(e, client_id=self.client_id, key=key, args=kwargs))
             return None
 
-    def safe_write(self, key, data):
+    def safe_write(self, key, data: Data):
         try:
             data = self.clean_write_data(key, data)
             if len(data) == 0:
@@ -262,7 +259,7 @@ class Connection(ABC):
         except Exception as e:
             self.on_write_error(Error(e, client_id=self.client_id, key=key, data=data))
 
-    async def _safe_write(self, key, data):
+    async def _safe_write(self, key, data: Data):
         try:
             data = self.clean_write_data(key, data)
             if len(data) == 0:
@@ -351,7 +348,7 @@ class Connection(ABC):
 
             deleted = record.pop("deleted_", None)
             if model is not None:
-                record = dict(model(**record))
+                record = model.validate(record)
             else:
                 if "t" not in record:
                     record["t"] = now()

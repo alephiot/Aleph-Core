@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from aleph_core.utils.datetime_functions import now
 from aleph_core.utils.exceptions import Exceptions
+from aleph_core.utils.typing import Record
 
 
 def generate_id():
@@ -46,10 +47,10 @@ class Model(pydantic.BaseModel):
         return self.dict(exclude_none=True, exclude_defaults=True)
 
     @classmethod
-    def validate(cls, record_as_dict: Dict):
+    def validate(cls, record: Record) -> Record:
         """Receives a dict and checks if it matches the model, otherwise it throws an InvalidModel error"""
         try:
-            cls.parse_obj(record_as_dict)
+            return cls(**record).to_dict()
         except pydantic.ValidationError as validation_error:
             raise Exceptions.InvalidModel(str(validation_error))
 
