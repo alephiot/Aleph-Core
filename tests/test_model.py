@@ -1,6 +1,6 @@
 from unittest import TestCase
 from aleph_core.utils.exceptions import Exceptions
-from aleph_core.utils.model import Model
+from aleph_core.utils.data import Model
 
 
 class TestModelA(Model):

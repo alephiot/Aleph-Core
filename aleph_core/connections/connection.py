@@ -1,10 +1,10 @@
 from aleph_core.utils.local_storage import LocalStorage
 from aleph_core.utils.wait_one_step import WaitOneStep
 from aleph_core.utils.exceptions import Exceptions, Error
-from aleph_core.utils.datetime_functions import now
-from aleph_core.utils.model import generate_id, Model
+from aleph_core.utils.time import now
+from aleph_core.utils.data import generate_id, DataSet
 from aleph_core.utils.report_by_exception import ReportByExceptionHelper
-from aleph_core.utils.typing import Data, Record
+from aleph_core.utils.typing import Record
 
 from typing import List, Dict, Any, Union
 from abc import ABC
@@ -14,13 +14,10 @@ import logging
 
 
 logger = logging.getLogger(__name__)
-SNF_BUFFER = "SNF_BUFFER"
 
 
 class Connection(ABC):
-    models: Union[dict[str, Model], List[Model]] = {}
     time_step = 10
-
     local_storage = LocalStorage()
     report_by_exception = False
     store_and_forward = False
@@ -31,9 +28,6 @@ class Connection(ABC):
         self.__async_loop__ = None
         self.__subscribed_keys__ = set()
         self.__report_by_exception_helpers__: dict[str, ReportByExceptionHelper] = {}
-
-        if isinstance(self.models, list):
-            self.models = {model.__key__: model for model in self.models}
 
     def open(self):
         """
@@ -47,13 +41,13 @@ class Connection(ABC):
         """
         return
 
-    def read(self, key: str, **kwargs):
+    def read(self, key: str, **kwargs) -> DataSet:
         """
         Must return a list (data, a list of records) or a dict (single record)
         """
         return []
 
-    def write(self, key: str, data: Data):
+    def write(self, key: str, data: DataSet):
         """
         Returns None.
         """
@@ -65,7 +59,7 @@ class Connection(ABC):
         """
         return True
 
-    def on_new_data(self, key: str, data: Data):
+    def on_new_data(self, key: str, data: DataSet):
         """
         Callback function for when a new message arrives. Data can be a dict or a list of
         dict. This function is used by the read_async, subscribe async and subscribe
@@ -73,17 +67,12 @@ class Connection(ABC):
         """
         return
 
-    def on_read_error(self, error: Error):
+    def on_error(self, error: Error):
         """
-        Callback function for when safe_read fails
+        Callback function for when a safe function fails
         """
         return
 
-    def on_write_error(self, error: Error):
-        """
-        Callback function for when safe_write fails
-        """
-        return
 
     def on_connect(self):
         """
@@ -203,7 +192,7 @@ class Connection(ABC):
             logger.info("Adding subscribe_async coroutine for key %s", key)
             self.__run_on_async_thread__(self.__subscribe_async__(key, time_step))
 
-    def write_async(self, key, data):
+    def write_async(self, key: str, data: DataSet):
         """
         Executes the safe_write function without blocking the main thread
         If the connection does not allow multithreading, we use the async thread
@@ -213,10 +202,10 @@ class Connection(ABC):
         else:
             self.__run_on_async_thread__(self._safe_write(key, data))
 
-    def unsubscribe(self, key):
+    def unsubscribe(self, key: str):
         self.__subscribed_keys__.discard(key)
 
-    def safe_read(self, key, **kwargs):
+    def safe_read(self, key: str, **kwargs) -> DataSet | None:
         try:
             if not self.is_open():
                 self.open()
@@ -224,13 +213,13 @@ class Connection(ABC):
             if data is None:
                 raise Exceptions.InvalidKey("Reading function returned None")
 
-            return self.clean_read_data(data)
+            return data
 
         except Exception as e:
-            self.on_read_error(Error(e, client_id=self.client_id, key=key, args=kwargs))
+            self.on_error(Error(e, client_id=self.client_id, key=key, args=kwargs))
             return None
 
-    async def _safe_read(self, key, **kwargs):
+    async def _safe_read(self, key: str, **kwargs):
         try:
             if not self.is_open():
                 self.open()
@@ -238,48 +227,48 @@ class Connection(ABC):
             if data is None:
                 raise Exceptions.InvalidKey("Reading function returned None")
 
-            return self.clean_read_data(data)
+            return data
 
         except Exception as e:
-            self.on_read_error(Error(e, client_id=self.client_id, key=key, args=kwargs))
+            self.on_error(Error(e, client_id=self.client_id, key=key, args=kwargs))
             return None
 
-    def safe_write(self, key, data: Data):
+    def safe_write(self, key: str, data: DataSet):
         try:
-            data = self.clean_write_data(key, data)
+            # TODO: Report by exception
             if len(data) == 0:
                 return
         except Exception as e:
-            self.on_write_error(Error(e, client_id=self.client_id, key=key, data=data))
+            self.on_error(Error(e, client_id=self.client_id, key=key, data=data))
 
         try:
             if not self.is_open():
                 self.open()
             self.flush_buffer(key=key, data=data)
         except Exception as e:
-            self.on_write_error(Error(e, client_id=self.client_id, key=key, data=data))
+            self.on_error(Error(e, client_id=self.client_id, key=key, data=data))
 
-    async def _safe_write(self, key, data: Data):
+    async def _safe_write(self, key: str, data: DataSet):
         try:
-            data = self.clean_write_data(key, data)
+            # TODO: Report by exception
             if len(data) == 0:
                 return
         except Exception as e:
-            self.on_write_error(Error(e, client_id=self.client_id, key=key, data=data))
+            self.on_error(Error(e, client_id=self.client_id, key=key, data=data))
 
         try:
             if not self.is_open():
                 self.open()
             await self._flush_buffer(key=key, data=data)
         except Exception as e:
-            self.on_write_error(Error(e, client_id=self.client_id, key=key, data=data))
+            self.on_error(Error(e, client_id=self.client_id, key=key, data=data))
 
     def flush_buffer(self, key=None, data=None):
         if key is not None and data is not None and not self.store_and_forward:
             self.write(key, data)
             return
 
-        buffer = self.local_storage.get(SNF_BUFFER, {})
+        buffer = self.local_storage.get(self.__class__.__name__, {})
         if key is None:
             for key_ in buffer:
                 self.flush_buffer(key=key_)
@@ -290,20 +279,20 @@ class Connection(ABC):
             buffer[key] = []
         if isinstance(data, list):
             buffer[key] = buffer[key] + data
-        self.local_storage.set(SNF_BUFFER, buffer)
+        self.local_storage.set(self.__class__.__name__, buffer)
 
         # Write data in buffer
         if buffer.get(key):
             self.write(key, buffer.get(key))
             buffer[key] = []
-            self.local_storage.set(SNF_BUFFER, buffer)
+            self.local_storage.set(self.__class__.__name__, buffer)
 
     async def _flush_buffer(self, key=None, data=None):
         if key is not None and data is not None and not self.store_and_forward:
             await self._write(key, data)
             return
 
-        buffer = self.local_storage.get(SNF_BUFFER, {})
+        buffer = self.local_storage.get(self.__class__.__name__, {})
         if key is None:
             for key_ in buffer:
                 await self._flush_buffer(key=key_)
@@ -314,53 +303,10 @@ class Connection(ABC):
             buffer[key] = []
         if isinstance(data, list):
             buffer[key] = data + buffer[key]
-        self.local_storage.set(SNF_BUFFER, buffer)
+        self.local_storage.set(self.__class__.__name__, buffer)
 
         # Write data in buffer
         if buffer.get(key):
             await self._write(key, buffer.get(key))
             buffer[key] = []
-            self.local_storage.set(SNF_BUFFER, buffer)
-
-    def clean_read_data(self, data):
-        if not isinstance(data, list):
-            data = [data]
-        for i in range(0, len(data)):
-            data[i] = dict(data[i])
-        return data
-
-    def clean_write_data(self, key, data):
-        """Checks models and report by exception"""
-        model = self.models.get(key, None)
-        if not isinstance(data, list):
-            data = [data]
-
-        report_by_exception_helper = None
-        if self.report_by_exception:
-            if key not in self.__report_by_exception_helpers__:
-                self.__report_by_exception_helpers__[key] = ReportByExceptionHelper()
-            report_by_exception_helper = self.__report_by_exception_helpers__[key]
-
-        cleaned_data = []
-        for record in data:
-            if not isinstance(record, dict):
-                record = dict(record)
-
-            deleted = record.pop("deleted_", None)
-            if model is not None:
-                record = model.validate(record)
-            else:
-                if "t" not in record:
-                    record["t"] = now()
-                if "id_" not in record:
-                    record["id_"] = generate_id()
-
-            if self.report_by_exception and report_by_exception_helper:
-                record = report_by_exception_helper.compare_record(record)
-
-            if record:
-                if deleted is not None:
-                    record["deleted_"] = deleted
-                cleaned_data.append(record)
-
-        return cleaned_data
+            self.local_storage.set(self.__class__.__name__, buffer)
