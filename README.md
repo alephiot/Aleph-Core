@@ -1,11 +1,8 @@
 
 
 
-## Tests
-
-Tests require docker
-
-## Docs
-
+```
+pip install -e .
+```
 
 
