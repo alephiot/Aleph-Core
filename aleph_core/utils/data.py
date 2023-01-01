@@ -24,8 +24,8 @@ class Model(pydantic.BaseModel):
     id_: Optional[str] = pydantic.Field(default_factory=generate_id, index=True)
     t: Optional[int] = pydantic.Field(default_factory=now, index=True)
 
-    __key__: str = None
-    __table__: TableModel = None
+    __key__: Optional[str] = None
+    __table__: Optional[TableModel] = None
 
     def to_dict(self):
         return self.dict(exclude_none=True, exclude_defaults=True)
@@ -42,7 +42,7 @@ class Model(pydantic.BaseModel):
     def to_table_model(cls) -> TableModel:
         if cls.__table__ is None:
             cls.__table__ = type(cls.__name__, (TableModel, cls), {}, table=True)  # type: ignore
-        return cls.__table__
+        return cls.__table__   # type: ignore
 
     @classmethod
     def validate(cls, record: Record) -> Record:
@@ -55,7 +55,7 @@ class Model(pydantic.BaseModel):
 
 class DataSet:
 
-    def __init__(self, records: RecordList = None, model: Model = None):
+    def __init__(self, records: Optional[RecordList] = None, model: Optional[Model] = None):
         self.model = model
         self._records = {}
 
@@ -90,7 +90,7 @@ class DataSet:
     def __len__(self):
         return len(self._records)
 
-    def most_recent(self, field, timestamp_threshold_in_seconds: int = None) -> Value:
+    def most_recent(self, field, timestamp_threshold_in_seconds: Optional[int] = None) -> Value:
         last_record = max(self._records, key=lambda record: record.get("t", 0) if field in record else 0)
         if timestamp_threshold_in_seconds is not None:
             if now() - last_record.get("t", None) > timestamp_threshold_in_seconds:
