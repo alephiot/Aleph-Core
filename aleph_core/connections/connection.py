@@ -6,7 +6,7 @@ from aleph_core.utils.data import generate_id, DataSet
 from aleph_core.utils.report_by_exception import ReportByExceptionHelper
 from aleph_core.utils.typing import Record
 
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, Optional
 from abc import ABC
 import threading
 import asyncio
@@ -41,11 +41,11 @@ class Connection(ABC):
         """
         return
 
-    def read(self, key: str, **kwargs) -> DataSet:
+    def read(self, key: str, **kwargs) -> Optional[DataSet]:
         """
         Must return a list (data, a list of records) or a dict (single record)
         """
-        return []
+        return DataSet()
 
     def write(self, key: str, data: DataSet):
         """
@@ -61,9 +61,7 @@ class Connection(ABC):
 
     def on_new_data(self, key: str, data: DataSet):
         """
-        Callback function for when a new message arrives. Data can be a dict or a list of
-        dict. This function is used by the read_async, subscribe async and subscribe
-        methods.
+        Callback function for when a new message arrives
         """
         return
 

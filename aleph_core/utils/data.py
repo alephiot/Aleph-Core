@@ -14,6 +14,9 @@ def generate_id():
 
 
 class TableModel(sqlmodel.SQLModel):
+    """
+    TODO 
+    """
     id_: Optional[str] = sqlmodel.Field(default_factory=generate_id, primary_key=True)
     deleted_: Optional[bool] = sqlmodel.Field(default=False)
 
@@ -21,6 +24,9 @@ class TableModel(sqlmodel.SQLModel):
 
 
 class Model(pydantic.BaseModel):
+    """
+    TODO
+    """
     id_: Optional[str] = pydantic.Field(default_factory=generate_id, index=True)
     t: Optional[int] = pydantic.Field(default_factory=now, index=True)
 
@@ -54,6 +60,8 @@ class Model(pydantic.BaseModel):
 
 
 class DataSet:
+    """
+    """
 
     def __init__(self, records: Optional[RecordList] = None, model: Optional[Model] = None):
         self.model = model
