@@ -1,17 +1,13 @@
-from aleph_core.utils.local_storage import LocalStorage
-from aleph_core.utils.wait_one_step import WaitOneStep
-from aleph_core.utils.exceptions import Exceptions, Error
-from aleph_core.utils.time import now
-from aleph_core.utils.data import generate_id, DataSet
-from aleph_core.utils.report_by_exception import ReportByExceptionHelper
-from aleph_core.utils.typing import Record
-
-from typing import List, Dict, Any, Union, Optional
+from typing import Dict, Optional
 from abc import ABC
 import threading
 import asyncio
 import logging
 
+from aleph_core.utils.local_storage import LocalStorage
+from aleph_core.utils.wait_one_step import WaitOneStep
+from aleph_core.utils.exceptions import Exceptions, Error
+from aleph_core.utils.data import DataSet
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +15,6 @@ logger = logging.getLogger(__name__)
 class Connection(ABC):
     time_step = 10
     local_storage = LocalStorage()
-    report_by_exception = False
     store_and_forward = False
     multi_thread = False
 
@@ -27,7 +22,6 @@ class Connection(ABC):
         self.client_id = client_id
         self.__async_loop__ = None
         self.__subscribed_keys__ = set()
-        self.__report_by_exception_helpers__: dict[str, ReportByExceptionHelper] = {}
 
     def open(self):
         """
@@ -279,8 +273,6 @@ class AsyncConnection(Connection):
     async def safe_write(self, key: str, data: DataSet):
         return super().safe_write(key, data)
     
-
-
     async def _open_async(self, time_step):
         pass # TODO
 
