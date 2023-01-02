@@ -99,7 +99,7 @@ class Connection(ABC):
 
         asyncio.run_coroutine_threadsafe(coroutine, self.__async_loop__)
 
-    async def __open_async__(self, time_step):
+    async def _open_async(self, time_step):
         wait_one_step = WaitOneStep(time_step)
 
         previous_state = False
@@ -116,18 +116,28 @@ class Connection(ABC):
                 if current_state and not previous_state:
                     logger.info("Connected")
                     self.on_connect()
-                    await self._flush_buffer()
-                if not current_state and previous_state:
+                    self._buffer_flush_all()
+                elif not current_state and previous_state:
                     logger.info("Disconnected")
                     self.on_disconnect()
+
             except Exception as e:
-                # TODO Handle?
-                print(Error(e).message_and_traceback)
+                logger.error("Failed on _open_async")
+                self.on_error(Error(e))
 
             previous_state = current_state
-            await wait_one_step.async_wait()
+            wait_one_step.wait()
 
-    def __subscribe__(self, key, time_step):
+    def open_async(self, time_step=None):
+        """
+        Executes the open function without blocking the main thread
+        Calls is_connected on a loop and tries to reconnect if disconnected
+        """
+        if time_step is None:
+            time_step = self.time_step
+        self.__run_on_async_thread__(self._open_async(time_step))
+
+    def _subscribe(self, key, time_step):
         wait_one_step = WaitOneStep(time_step)
         while True:
             try:
@@ -142,38 +152,20 @@ class Connection(ABC):
                 self.unsubscribe(key)
                 raise
 
-    async def __subscribe_async__(self, key, time_step):
+    async def _subscribe_async(self, key, time_step):
         wait_one_step = WaitOneStep(time_step)
         while True:
             try:
-                await wait_one_step.async_wait()
+                wait_one_step.wait()
                 if key not in self.__subscribed_keys__:
                     break
-                data = await self._safe_read(key)
+                data = self.safe_read(key)
                 if data is None or len(data) == 0:
                     continue
                 self.on_new_data(key, data)
             except Exception:
                 self.unsubscribe(key)
                 raise
-
-    async def _open(self):
-        self.open()
-
-    async def _read(self, key, **kwargs):
-        return self.read(key, **kwargs)
-
-    async def _write(self, key, data):
-        self.write(key, data)
-
-    def open_async(self, time_step=None):
-        """
-        Executes the open function without blocking the main thread
-        Calls is_connected on a loop and tries to reconnect if disconnected
-        """
-        if time_step is None:
-            time_step = self.time_step
-        self.__run_on_async_thread__(self.__open_async__(time_step))
 
     def subscribe_async(self, key, time_step=None):
         """Executes the read function on a loop, without blocking the main thread"""
@@ -185,10 +177,13 @@ class Connection(ABC):
 
         if self.multi_thread:
             logger.info("Creating subscribe_async thread for key %s", key)
-            threading.Thread(target=self.__subscribe__, args=(key, time_step,), daemon=True).start()
+            threading.Thread(target=self._subscribe, args=(key, time_step,), daemon=True).start()
         else:
             logger.info("Adding subscribe_async coroutine for key %s", key)
-            self.__run_on_async_thread__(self.__subscribe_async__(key, time_step))
+            self.__run_on_async_thread__(self._subscribe_async(key, time_step))
+
+    async def _write_async(self, key, data):
+        self.safe_write(key, data)
 
     def write_async(self, key: str, data: DataSet):
         """
@@ -198,7 +193,7 @@ class Connection(ABC):
         if self.multi_thread:
             threading.Thread(target=self.safe_write, args=(key, data,), daemon=True).start()
         else:
-            self.__run_on_async_thread__(self._safe_write(key, data))
+            self.__run_on_async_thread__(self._write_async(key, data))
 
     def unsubscribe(self, key: str):
         self.__subscribed_keys__.discard(key)
@@ -208,20 +203,6 @@ class Connection(ABC):
             if not self.is_open():
                 self.open()
             data = self.read(key, **kwargs)
-            if data is None:
-                raise Exceptions.InvalidKey("Reading function returned None")
-
-            return data
-
-        except Exception as e:
-            self.on_error(Error(e, client_id=self.client_id, key=key, args=kwargs))
-            return None
-
-    async def _safe_read(self, key: str, **kwargs):
-        try:
-            if not self.is_open():
-                self.open()
-            data = await self._read(key, **kwargs)
             if data is None:
                 raise Exceptions.InvalidKey("Reading function returned None")
 
@@ -242,69 +223,80 @@ class Connection(ABC):
         try:
             if not self.is_open():
                 self.open()
-            self.flush_buffer(key=key, data=data)
+            self._buffer_add_and_flush(key=key, data=data)
         except Exception as e:
             self.on_error(Error(e, client_id=self.client_id, key=key, data=data))
 
-    async def _safe_write(self, key: str, data: DataSet):
-        try:
-            # TODO: Report by exception
-            if len(data) == 0:
-                return
-        except Exception as e:
-            self.on_error(Error(e, client_id=self.client_id, key=key, data=data))
+    def _buffer_name(self):
+        return self.__class__.__name__
 
-        try:
-            if not self.is_open():
-                self.open()
-            await self._flush_buffer(key=key, data=data)
-        except Exception as e:
-            self.on_error(Error(e, client_id=self.client_id, key=key, data=data))
+    def _buffer_flush_all(self):
+        if not self.store_and_forward:
+            return
+        
+        buffer = self.local_storage.get(self._buffer_name(), {})
+        for key in buffer:
+            try:
+                self.write(key, DataSet(buffer.get(key)))
+                buffer[key] = []
+                self.local_storage.set(self._buffer_name(), buffer)
+            except:
+                continue
 
-    def flush_buffer(self, key=None, data=None):
-        if key is not None and data is not None and not self.store_and_forward:
+    def _buffer_add_and_flush(self, key: str, data: DataSet):
+        if not self.store_and_forward:
             self.write(key, data)
             return
-
-        buffer = self.local_storage.get(self.__class__.__name__, {})
-        if key is None:
-            for key_ in buffer:
-                self.flush_buffer(key=key_)
-            return
-
-        # Add new data to buffer and save
+        
+        buffer = self.local_storage.get(self._buffer_name(), {})
         if key not in buffer:
             buffer[key] = []
-        if isinstance(data, list):
-            buffer[key] = buffer[key] + data
-        self.local_storage.set(self.__class__.__name__, buffer)
+        buffer[key] = buffer[key] + list(data)
+        self.local_storage.set(self._buffer_name(), buffer)
+        
+        self.write(key, DataSet(buffer.get(key)))
+        buffer[key] = []
+        self.local_storage.set(self._buffer_name(), buffer)
 
-        # Write data in buffer
-        if buffer.get(key):
-            self.write(key, buffer.get(key))
-            buffer[key] = []
-            self.local_storage.set(self.__class__.__name__, buffer)
 
-    async def _flush_buffer(self, key=None, data=None):
-        if key is not None and data is not None and not self.store_and_forward:
-            await self._write(key, data)
-            return
+class AsyncConnection(Connection):
 
-        buffer = self.local_storage.get(self.__class__.__name__, {})
-        if key is None:
-            for key_ in buffer:
-                await self._flush_buffer(key=key_)
-            return
+    async def open(self):
+        return super().open()
+    
+    async def close(self):
+        return super().close()
+    
+    async def read(self, key: str, **kwargs) -> Optional[DataSet]:
+        return super().read(key, **kwargs)
+    
+    async def write(self, key: str, data: DataSet):
+        return super().write(key, data)
 
-        # Add new data to buffer and save
-        if key not in buffer:
-            buffer[key] = []
-        if isinstance(data, list):
-            buffer[key] = data + buffer[key]
-        self.local_storage.set(self.__class__.__name__, buffer)
+    async def safe_read(self, key: str, **kwargs) -> DataSet | None:
+        return super().safe_read(key, **kwargs)
+    
+    async def safe_write(self, key: str, data: DataSet):
+        return super().safe_write(key, data)
+    
 
-        # Write data in buffer
-        if buffer.get(key):
-            await self._write(key, buffer.get(key))
-            buffer[key] = []
-            self.local_storage.set(self.__class__.__name__, buffer)
+
+    async def _open_async(self, time_step):
+        pass # TODO
+
+    def _subscribe(self, key, time_step):
+        pass # TODO
+
+    async def _subscribe_async(self, key, time_step):
+        pass # TODO
+
+    async def _write_async(self, key, data):
+        await self.safe_write(key, data)
+    
+    async def _buffer_flush_all(self):
+        pass # TODO
+
+    async def _buffer_add_and_flush(self, key: str, data: DataSet):
+        pass # TODO
+
+
