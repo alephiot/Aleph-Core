@@ -1,4 +1,6 @@
+from typing import Optional
 from unittest import TestCase
+
 from aleph_core.utils.exceptions import Exceptions
 from aleph_core.utils.data import Model
 
@@ -16,8 +18,10 @@ class TestModelB(Model):
 
 
 class TestModelC(Model):
-    a: TestModelA
-    b: TestModelB
+    u: int
+    v: Optional[int]
+    w: int = 1
+    z: Optional[int] = 2
 
 
 class ModelTestCase(TestCase):
@@ -25,8 +29,15 @@ class ModelTestCase(TestCase):
     def test_validate(self):
         self.assertRaises(
             Exceptions.InvalidModel,
-            lambda: TestModelA.validate({"a": "hello"}),
+            lambda: TestModelA.validate_record({"a": "hello"}),
         )
 
-        TestModelA.validate({"a": "hello", "b": 1, "c": 2.5, "d": True})
+        record = TestModelA.validate_record({"a": "hello", "b": 1, "c": 2.5, "d": True})
+        self.assertTrue("id_" not in record)
+        self.assertTrue("t" not in record)
+
+        record = TestModelA.validate_record({"a": "hello"}, exclude_unset=True)
+        self.assertTrue("id_" not in record)
+
+
 
