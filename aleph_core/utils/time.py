@@ -1,18 +1,16 @@
-from aleph_core.utils.exceptions import Exceptions
-
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from typing import Any
 
+from aleph_core.utils.exceptions import Exceptions
 
-def parse_date_to_timestamp(date: any) -> int:
-    """Takes a date in multiple formats and returns the equivalent timestamp"""
+def parse_date_to_timestamp(date: Any) -> int:
+    """Takes a date in multiple formats and returns the equivalent timestamp in milliseconds"""
     if isinstance(date, int) or isinstance(date, float):
         if date < 315360000:  # Sunday, December 30, 1979
             return int(now() - date)
         else:
             return int(date)
-    elif isinstance(date, str):
-        pass
     elif date is None:
         return now()
     else:
@@ -20,7 +18,7 @@ def parse_date_to_timestamp(date: any) -> int:
 
 
 def timestamp_to_string(timestamp: int, timezone: str = "UTC", date_format: str = "%Y-%m-%d %H:%M:%S") -> str:
-    """Takes a unix timestamp in seconds and returns a string"""
+    """Takes a unix timestamp in milliseconds and returns a string"""
     date = datetime.utcfromtimestamp(timestamp).replace(tzinfo=ZoneInfo("UTC"))
     if timezone != "UTC":
         date = date.astimezone(ZoneInfo(timezone))
@@ -28,5 +26,5 @@ def timestamp_to_string(timestamp: int, timezone: str = "UTC", date_format: str 
 
 
 def now() -> int:
-    """Current timestamp"""
-    return int(datetime.now().timestamp())
+    """Current timestamp in milliseconds"""
+    return int(datetime.now().timestamp() * 1000)
