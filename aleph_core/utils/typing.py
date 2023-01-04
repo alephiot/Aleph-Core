@@ -1,6 +1,3 @@
-from typing import Dict, List, Any, Optional, Union
+Value = str | float | int | bool | None
+Record = dict[str, Value]
 
-
-Value = Optional[Union[str, float, int, bool]]
-Record = Dict[str, Value]
-RecordList = List[Record]

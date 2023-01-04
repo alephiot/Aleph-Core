@@ -24,58 +24,34 @@ class Connection(ABC):
         self.__subscribed_keys__ = set()
 
     def open(self):
-        """
-        Opens the connection. If it fails, it must raise an Exception
-        """
         return
 
     def close(self):
-        """
-        Closes the connection.
-        """
         return
 
     def read(self, key: str, **kwargs) -> Optional[DataSet]:
-        """
-        Must return a list (data, a list of records) or a dict (single record)
-        """
-        return DataSet()
+        return None
 
     def write(self, key: str, data: DataSet):
-        """
-        Returns None.
-        """
         return
 
-    def is_open(self):
-        """
-        Returns a boolean (True if open, False if not open)
-        """
+    def is_open(self) -> bool:
         return True
 
     def on_new_data(self, key: str, data: DataSet):
-        """
-        Callback function for when a new message arrives
-        """
+        """Callback function for when a new message arrives"""
         return
 
     def on_error(self, error: Error):
-        """
-        Callback function for when a safe function fails
-        """
+        """Callback function for when a safe function fails"""
         return
 
-
     def on_connect(self):
-        """
-        Callback function for when the connection is open
-        """
+        """Callback function for when the connection is open"""
         return
 
     def on_disconnect(self):
-        """
-        Callback function for when the connection is closed
-        """
+        """Callback function for when the connection is closed"""
         return
 
     def __enter__(self):
@@ -211,6 +187,8 @@ class Connection(ABC):
             # TODO: Report by exception
             if len(data) == 0:
                 return
+            if not isinstance(data, DataSet):
+                data = DataSet(data)
         except Exception as e:
             self.on_error(Error(e, client_id=self.client_id, key=key, data=data))
 
