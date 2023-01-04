@@ -85,7 +85,10 @@ class DataSet:
         self._records = {}
         self.update(records)
 
-    def update(self, records: list[Record], sort=True):
+    def update(self, records: Record | list[Record], sort=True):
+        if isinstance(records, dict):
+            records = [records]
+        
         for record in records:
             if self.model is not None:
                 record = self.model(**record).dict()
