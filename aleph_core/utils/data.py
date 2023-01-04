@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from aleph_core.utils.time import now
 from aleph_core.utils.exceptions import Exceptions
-from aleph_core.utils.typing import Record, RecordList, Value
+from aleph_core.utils.typing import Record, Value
 
 
 def generate_id():
@@ -69,7 +69,7 @@ class Model(pydantic.BaseModel):
 
 class DataSet:
 
-    def __init__(self, records: Optional[RecordList] = None, model: Optional[Type[Model]] = None):
+    def __init__(self, records: Optional[list[Record]] = None, model: Optional[Type[Model]] = None):
         self.model = model
         self._records = {}
 
@@ -78,14 +78,14 @@ class DataSet:
 
     @property
     def records(self):
-        return list(self._records.values())  # TODO sort?
+        return list(self._records.values())
 
     @records.setter
-    def records(self, records: RecordList):
+    def records(self, records: list[Record]):
         self._records = {}
         self.update(records)
 
-    def update(self, records: RecordList):
+    def update(self, records: list[Record], sort=True):
         for record in records:
             if self.model is not None:
                 record = self.model(**record).dict()
@@ -97,15 +97,31 @@ class DataSet:
 
             self._records.update({self.__get_record_id__(record): record})
 
+        # if sort:
+        #     self._records = sorted(self._records, key=lambda record: record.get("t", 0), reverse=True)
+
+    def __getitem__(self, item):
+        return self.records[item]
+
     def __iter__(self):
-        for r in self._records:  # TODO sorted?
+        for r in self._records:
             yield self._records[r]
 
     def __len__(self):
         return len(self._records)
+    
+    def __str__(self):
+        model_str = self.model.__name__ if self.model is not None else 'None'
+        records_str = "\n".join([str(record) for record in self._records.values()])
+        if len(records_str):
+            records_str = "\n:" + records_str
 
+        return f"DataSet<{model_str}>({len(self)})" + records_str
+    
     def most_recent(self, field, timestamp_threshold_in_seconds: Optional[int] = None) -> Value:
-        last_record = max(self._records.values(), key=lambda item: (item.get("t", 0) if item.get(field, None) is not None else 0))
+        get_time_from_item = lambda item: item.get("t", 0) if item.get(field, None) is not None else 0
+        last_record = max(self._records.values(), key=get_time_from_item)
+
         if timestamp_threshold_in_seconds is not None:
             if now() - last_record.get("t", None) > timestamp_threshold_in_seconds:
                 return None
