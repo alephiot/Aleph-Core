@@ -1,7 +1,7 @@
-import time
 from typing import Optional
 from abc import ABC
 import docker
+import time
 
 
 class DockerContainer(ABC):

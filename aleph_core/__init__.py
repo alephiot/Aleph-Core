@@ -1,6 +1,6 @@
-from .connections.connection import Connection
-from .services.service import Service
+from aleph_core.connections.connection import Connection
+from aleph_core.services.service import Service
 
-from .utils.exceptions import Exceptions, Error
-from .utils.data import Model
-from .utils.data import DataSet
+from aleph_core.utils.exceptions import Exceptions, Error
+from aleph_core.utils.data import Model
+from aleph_core.utils.data import DataSet
