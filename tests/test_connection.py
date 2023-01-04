@@ -27,7 +27,6 @@ class CaughtWriteException(Exception):
 
 class TestConnection(Connection):
     connected = False
-    models = {"A": TestModel}
     time_step = 1
 
     force_close = False
@@ -185,6 +184,8 @@ class ConnectionTestCase(TestCase):
             "b": 1,
             "c": 2.5,
             "d": False,
+            "id_": "1",
+            "t": 100,
         }
         self.conn.safe_write("A", [test_record])
         written_record = self.conn.written_values.get("A")[-1]
@@ -195,11 +196,11 @@ class ConnectionTestCase(TestCase):
             "b": "1",
             "c": "2.5",
             "d": "False",
+            "id_": 1,
+            "t": 100,
         }
-        self.conn.safe_write("A", [altered_record])
+        self.conn.safe_write("A", DataSet([altered_record], TestModel))
         written_record = self.conn.written_values.get("A")[-1]
-        print(test_record)
-        print(written_record)
         self.assertTrue(all([test_record[r] == written_record[r] for r in test_record]))
 
         self.conn.safe_write("B", {"b": "test"})
