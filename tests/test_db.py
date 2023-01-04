@@ -2,12 +2,13 @@ import time
 import os
 from enum import Enum
 from unittest import TestCase
+from typing import Optional
 
 from aleph_core.connections.db.rds import RDSConnection
-from aleph_core import Model
+from aleph_core import Model, DataSet
 
 
-NOW = time.time()
+NOW = int(time.time() * 1000)
 KEY = "test.key"
 
 
@@ -19,8 +20,8 @@ class TestEnum(str, Enum):
 class TestModel(Model):
     __key__ = KEY
 
-    a: int = None
-    b: str = None
+    a: Optional[int] = None
+    b: Optional[str] = None
     c: TestEnum = TestEnum.option_2
 
     @staticmethod
@@ -72,10 +73,11 @@ class RDSGenericTestCase(TestCase):
 
         # Write
         records = TestModel.samples()
-        conn.write(KEY, records)
+        conn.write(KEY, DataSet(records))
 
         # Read
         a = conn.read(KEY, limit=1)
+        self.assertIsNotNone(a)
         self.assertEqual(len(a), 1)
         self.assertTrue("deleted_" not in a[0])
         self.assertTrue("_id" not in a[0])
