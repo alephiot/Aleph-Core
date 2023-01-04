@@ -100,11 +100,25 @@ class DataSet:
 
             self._records.update({self.__get_record_id__(record): record})
 
-        # if sort:
-        #     self._records = sorted(self._records, key=lambda record: record.get("t", 0), reverse=True)
+        # TODO sort
 
+    def get_by_id(self, id_, default=None):
+        for r in self._records:
+            if id_ == self._records[r].get("id_"):
+                return self._records[r]
+        return default
+
+    def get_by_t(self, t, default=None):
+        for r in self._records:
+            if t == self._records[r].get("t"):
+                return self._record[r]
+        return default
+        
     def __getitem__(self, item):
         return self.records[item]
+    
+    def __setitem__(self, item, value):
+        self.records[item] = value
 
     def __iter__(self):
         for r in self._records:

@@ -35,7 +35,7 @@ class MqttClient:
 
         self.connected = False
         self.connecting = False
-        self.client: Optional[mqtt.Client] = None
+        self.client: mqtt.Client = None
 
         self.__subscribe_topics__ = set()
         self.__subscribe_topics_once__ = set()
