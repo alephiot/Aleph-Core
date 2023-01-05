@@ -8,11 +8,12 @@ from aleph_core import Exceptions
 
 class RDSConnection(Connection):
     url = ""
-    __engine__ = None
+    models = []
 
     def __init__(self, client_id=""):
         super().__init__(client_id)
         self.__tables__ = {}
+        self.__engine__ = None
 
         if len(self.models) == 0:
             raise Exception("The Relational Database needs models to work properly")
