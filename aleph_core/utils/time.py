@@ -16,37 +16,10 @@ def parse_date_to_timestamp(date: Any) -> int:
             return int(date * 1000)
         else:
             return int(date)
-        
     elif date is None:
         return now()
-    
     elif isinstance(date, datetime):
         return date.timestamp()
-    
-    elif isinstance(date, str):
-        valid_formats = [
-            "%Y%m%d",
-            "%y%m%d",
-            "%Y-%m-%d",
-            "%y-%m-%d",
-            "%d/%m/%Y",
-            "%d/%m/%y",
-            "%Y-%m-%d %H:%M",
-            "%Y-%m-%d %H:%M:%S",
-            "%y-%m-%d %H:%M",
-            "%y-%m-%d %H:%M:%S",
-            "%d/%m/%Y %H:%M",
-            "%d/%m/%Y %H:%M:%S",
-            "%d/%m/%y %H:%M",
-            "%d/%m/%y %H:%M:%S",
-        ]
-
-        for string in valid_formats:
-            try:
-                return datetime.strptime(string, date).timestamp()
-            except:
-                continue
-
     else:
         raise Exceptions.InvalidDate()
 

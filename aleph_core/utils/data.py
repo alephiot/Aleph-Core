@@ -111,7 +111,7 @@ class DataSet:
     def get_by_t(self, t, default=None):
         for r in self._records:
             if t == self._records[r].get("t"):
-                return self._record[r]
+                return self._records[r]
         return default
         
     def __getitem__(self, item):

@@ -25,6 +25,26 @@ class DataSetTestCase(TestCase):
 
         self.assertEqual(len(list(data_set)), 2)
 
+    def test_get(self):
+        data_set = DataSet([
+            {"x": "a", "id_": "1", "t": 1},
+            {"x": "b", "id_": "2", "t": 2},
+            {"x": "c", "id_": "3", "t": 3},
+        ])
+
+        self.assertEqual(len(data_set), 3)
+
+        self.assertEqual(data_set[0]["id_"], "1")
+        self.assertEqual(data_set[-1]["id_"], "3")
+
+        self.assertEqual(data_set.get_by_id("1")["x"], "a")
+        self.assertEqual(data_set.get_by_id("3")["x"], "c")
+        self.assertIsNone(data_set.get_by_id("4"))
+
+        self.assertEqual(data_set.get_by_t(1)["x"], "a")
+        self.assertEqual(data_set.get_by_t(3)["x"], "c")
+        self.assertIsNone(data_set.get_by_t(4))
+
     def test_most_recent(self):
         record1 = TestModelA(a="1", b=2, c=None, t=1).dict()
         record2 = TestModelA(a="2", b=4, c=3, t=2).dict()
