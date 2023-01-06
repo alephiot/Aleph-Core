@@ -4,11 +4,12 @@ import json
 
 from aleph_core import Connection
 from aleph_core import Exceptions
+from aleph_core import Model
 
 
 class RDSConnection(Connection):
-    url = ""
-    models = []
+    url: str = ""
+    models: dict[str, Model] = {}
 
     def __init__(self, client_id=""):
         super().__init__(client_id)

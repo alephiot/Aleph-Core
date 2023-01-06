@@ -43,7 +43,9 @@ class TestModel(Model):
 
 class SQLiteConnection(RDSConnection):
     FILE = "test.db"
+
     url = f"sqlite:///{FILE}"
+    models = {}
 
     def on_read_error(self, error):
         error.raise_exception()
