@@ -53,7 +53,7 @@ class DataSetTestCase(TestCase):
         data_set = DataSet(records=[record1, record2, record3, record4], model=TestModelA)
         
         most_recent = data_set.most_recent("b")
-        self.assertEqual(most_recent, 1)
+        self.assertEqual(most_recent, record4)
 
         most_recent = data_set.most_recent("c")
-        self.assertEqual(most_recent, 3)
+        self.assertEqual(most_recent, record2)
