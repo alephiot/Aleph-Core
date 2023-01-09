@@ -19,6 +19,8 @@ class RDSConnection(Connection):
         if len(self.models) == 0:
             raise Exception("The Relational Database needs models to work properly")
 
+        if isinstance(self.models, list):
+            self.models = {model.__key__: model for model in self.models}
         for key in self.models:
             self.__tables__[key] = self.models[key].to_table_model()
 
@@ -52,8 +54,9 @@ class RDSConnection(Connection):
         return result
 
     def read(self, key, **kwargs):
+        
         if key not in self.__tables__:
-            return None
+            raise Exceptions.InvalidKey(f"Cannot match '{key}' with a model")
 
         if self.__engine__ is None:
             raise Exceptions.ConnectionNotOpen()
@@ -101,8 +104,9 @@ class RDSConnection(Connection):
         return result
 
     def write(self, key, data):
+
         if key not in self.__tables__:
-            return None
+            raise Exceptions.InvalidKey(f"Cannot match '{key}' with a model")
 
         if self.__engine__ is None:
             raise Exceptions.ConnectionNotOpen()
@@ -114,11 +118,11 @@ class RDSConnection(Connection):
                 instance = None
                 if "id_" in record and record["id_"]:
                     instance = session.query(table).get(record["id_"])
-
                 if instance is None:
                     instance = table(**record)
                 else:
-                    instance.update(**record)
+                    for field in record:
+                        setattr(instance, field, record[field])
 
                 session.add(instance)
             session.commit()
