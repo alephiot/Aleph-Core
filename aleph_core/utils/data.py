@@ -68,7 +68,6 @@ class Model(pydantic.BaseModel):
         except pydantic.ValidationError as validation_error:
             raise Exceptions.InvalidModel(str(validation_error))
 
-
 class DataSet:
 
     def __init__(self, records: Optional[list[Record]] = None, model: Optional[Type[Model]] = None):
@@ -80,7 +79,7 @@ class DataSet:
 
     @property
     def records(self):
-        return list(self._records.values())
+        return [self._return_record(record) for record in self._records.values()]
 
     @records.setter
     def records(self, records: list[Record]):
@@ -88,10 +87,13 @@ class DataSet:
         self.update(records)
 
     def update(self, records: Record | list[Record], sort=True):
-        if isinstance(records, dict):
+        if not isinstance(records, list):
             records = [records]
         
         for record in records:
+            if not isinstance(record, dict):
+                record = dict(record)
+            
             if self.model is not None:
                 record = self.model(**record).dict()
             else:
@@ -100,7 +102,7 @@ class DataSet:
                 if "id_" not in record:
                     record["id_"] = generate_id()
 
-            self._records.update({self.__get_record_id__(record): record})
+            self._records.update({self._get_record_id(record): record})
 
         # TODO sort
 
@@ -124,8 +126,8 @@ class DataSet:
 
     def __iter__(self):
         for r in self._records:
-            yield self._records[r]
-
+            yield self._return_record(self._records[r])
+            
     def __len__(self):
         return len(self._records)
     
@@ -145,10 +147,12 @@ class DataSet:
             if now() - last_record.get("t", None) > timestamp_threshold_in_seconds:
                 return None
         
-        return last_record.get(field)
+        return self._return_record(last_record)
+    
+    def _return_record(self, record: Record):
+        return record
 
-    @classmethod
-    def __get_record_id__(cls, record: Record):
+    def _get_record_id(self, record: Record):
         id_ = record.get("id_", None)
         if id_ is None:
             id_ = record.get("t", None)
