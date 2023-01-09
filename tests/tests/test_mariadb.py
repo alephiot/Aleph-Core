@@ -1,12 +1,7 @@
 from aleph_core.connections.db.rds import RDSConnection
 
 from utils.docker import MariaDBContainer
-from test_db import TestModel, RDSGenericTestCase
-import time
-
-
-NOW = time.time()
-KEY = "test.key"
+from tests.test_db import TestModel, RDSGenericTestCase
 
 
 class MariaDBConnection(RDSConnection):
