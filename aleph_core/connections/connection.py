@@ -185,11 +185,12 @@ class Connection(ABC):
     def safe_write(self, key: str, data: DataSet):
         try:
             # TODO: Report by exception
-            if len(data) == 0:
-                return
             if not isinstance(data, DataSet):
                 data = DataSet(data)
+            if len(data) == 0:
+                return
         except Exception as e:
+            raise
             self.on_error(Error(e, client_id=self.client_id, key=key, data=data))
 
         try:
