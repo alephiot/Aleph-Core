@@ -1,6 +1,8 @@
 import pydantic
 import sqlmodel
 
+from sqlalchemy import Column, BigInteger
+
 from typing import Optional, Type
 from uuid import uuid4
 
