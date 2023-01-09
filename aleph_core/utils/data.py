@@ -17,7 +17,7 @@ def generate_id():
 
 class TableModel(sqlmodel.SQLModel):
     id_: Optional[str] = sqlmodel.Field(default_factory=generate_id, primary_key=True)
-    t: Optional[int] = sqlmodel.Field(default_factory=now, index=True)
+    t: Optional[int] = sqlmodel.Field(default_factory=now, index=True, sa_column=Column(BigInteger()))
     deleted_: Optional[bool] = sqlmodel.Field(default=False)
 
     __table_args__ = {'extend_existing': True}
