@@ -1,5 +1,4 @@
 import logging
-import json
 
 from aleph_core import Service
 from aleph_core.connections.namespace.mqtt import MqttNamespaceConnection
