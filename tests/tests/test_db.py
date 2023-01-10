@@ -85,16 +85,6 @@ class DBGenericTestCase(TestCase):
         self.assertEqual(len(g), 0)
 
         conn.close()
-        conn = self.conn()
-        with conn.get_session() as session:
-            model = TestModel.to_table_model()
-            new_instance = model(a=1, b="hello", c=TestEnum.option_1, id_=None)
-            session.add(new_instance)
-
-            self.assertIsNone(new_instance.id_)
-            session.flush()
-            self.assertIsNotNone(new_instance.id_)
-            session.commit()
 
     def test_deleted(self):
         conn = self.conn()
@@ -138,7 +128,6 @@ class DBGenericTestCase(TestCase):
 class RDSGenericTestCase(DBGenericTestCase):
 
     def test_run_sql(self):
-
         with self.conn() as conn:
             records = TestModel.samples()
             conn.write(KEY, records)
@@ -153,3 +142,16 @@ class RDSGenericTestCase(DBGenericTestCase):
             r = conn.run_sql_query("SELECT * FROM testmodel")
             self.assertIsNotNone(r)
             self.assertEqual(len(r), 0)
+
+    def test_get_session(self):
+        conn = self.conn()
+        
+        with conn.get_session() as session:
+            model = TestModel.to_table_model()
+            new_instance = model(a=1, b="hello", c=TestEnum.option_1, id_=None)
+            session.add(new_instance)
+
+            self.assertIsNone(new_instance.id_)
+            session.flush()
+            self.assertIsNotNone(new_instance.id_)
+            session.commit()

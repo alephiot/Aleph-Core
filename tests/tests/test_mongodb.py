@@ -1,9 +1,10 @@
+import time
+
 from aleph_core.connections.db.mongodb import MongoDBConnection
 
 from utils.docker import MongoDBContainer
-from test_db import TestModel
-from test_db import RDSGenericTestCase
-import time
+from tests.test_db import TestModel
+from tests.test_db import DBGenericTestCase
 
 
 NOW = time.time()
@@ -17,14 +18,11 @@ class TestConnection(MongoDBConnection):
     def drop_all(self):
         self.client.drop_database(self.database)
 
-    def on_read_error(self, error):
-        error.raise_exception()
-
-    def on_write_error(self, error):
+    def on_error(self, error):
         error.raise_exception()
 
 
-class MongoDBTestCase(RDSGenericTestCase):
+class MongoDBTestCase(DBGenericTestCase):
     conn = TestConnection
     container = MongoDBContainer()
 
@@ -46,5 +44,3 @@ class MongoDBTestCase(RDSGenericTestCase):
         conn.open()
         conn.drop_all()
 
-    def test_run_sql(self):
-        pass
