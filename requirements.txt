@@ -9,3 +9,4 @@ paho-mqtt~=1.6.1
 redis~=4.4.0
 sqlitedict~=2.1.0
 PyMySQL~=1.0.2
+pymongo~=4.3.3
