@@ -1,20 +1,16 @@
 import logging
 import time
 
-from aleph_core import Connection
+from aleph_core import Connection, Error
 
 logger = logging.getLogger(__name__)
 
 
 class Service:
-    """
-    TODO
-    """
-
     main_connection: Connection
     link_connection: Connection
-    main_connection_subscribe_keys = {}
-    link_connection_subscribe_keys = {}
+    main_connection_subscribe_keys: dict[str, int] | list[str] = {}
+    link_connection_subscribe_keys: dict[str, int] | list[str] = {}
 
     __status__ = None
 
@@ -27,8 +23,8 @@ class Service:
     def on_new_data_from_link_connection(self, key, data):
         self.main_connection.write_async(key, data)
 
-    def on_error(self, error):
-        return
+    def on_error(self, error: Error):
+        logger.error(error.message)
 
     def on_status_change(self, status_code: int):
         """
