@@ -20,7 +20,14 @@ class RDSConnection(Connection):
             raise Exception("The Relational Database needs models to work properly")
 
         if isinstance(self.models, list):
-            self.models = {model.__key__: model for model in self.models}
+            _models = {}
+            for model in self.models:
+                if model.__key__ is None:
+                    raise Exceptions.InvalidModel(f"Missing __key__ on model '{model.__name__}'")
+                _models[model.__key__] = model
+
+            self.models = _models
+                
         for key in self.models:
             self.__tables__[key] = self.models[key].to_table_model()
 
