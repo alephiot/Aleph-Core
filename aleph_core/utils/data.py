@@ -132,13 +132,20 @@ class DataSet:
         return len(self._records)
     
     def __str__(self):
-        model_str = self.model.__name__ if self.model is not None else 'None'
         records_str = "\n".join([str(record) for record in self._records.values()])
         if len(records_str):
-            records_str = "\n:" + records_str
+            records_str = ":\n" + records_str
 
-        return f"DataSet<{model_str}>({len(self)})" + records_str
+        return repr(self) + records_str
     
+    def __repr__(self):
+        if self.model is None:
+            model_str = 'None'
+        else:
+            model_str = self.model.__name__
+            
+        return f"DataSet<{model_str}>({len(self)})"
+
     def most_recent(self, field, timestamp_threshold_in_seconds: Optional[int] = None) -> Value:
         get_time_from_item = lambda item: item.get("t", 0) if item.get(field, None) is not None else 0
         last_record = max(self._records.values(), key=get_time_from_item)
