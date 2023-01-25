@@ -3,7 +3,7 @@ import sqlmodel
 
 from sqlalchemy import Column, BigInteger
 
-from typing import Optional, Type
+from typing import Optional, Type, Any
 from uuid import uuid4
 
 from aleph_core.utils.time import now
@@ -72,7 +72,7 @@ class DataSet:
 
     def __init__(self, records: Optional[list[Record]] = None, model: Optional[Type[Model]] = None):
         self.model = model
-        self._records = {}
+        self._records: dict[Any, Record] = {}
 
         if records is not None:
             self.update(records)
@@ -91,6 +91,9 @@ class DataSet:
             records = [records]
         
         for record in records:
+            if self.model is None and isinstance(record, Model):
+                self.model = type(record)
+
             if not isinstance(record, dict):
                 record = dict(record)
             
@@ -104,7 +107,10 @@ class DataSet:
 
             self._records.update({self._get_record_id(record): record})
 
-        # TODO sort
+        if sort: # TODO: test
+            items = self._records.items()
+            sorted_items = sorted(items, key=lambda item: item[1].get("t"))
+            self._records = {key: value for key, value in sorted_items}
 
     def get_by_id(self, id_, default=None):
         for r in self._records:
