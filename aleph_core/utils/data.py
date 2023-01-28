@@ -1,6 +1,9 @@
 import pydantic
 import sqlmodel
+import json
+import os
 
+from pathlib import Path
 from sqlalchemy import Column, BigInteger
 
 from typing import Optional, Type, Any
@@ -67,6 +70,7 @@ class Model(pydantic.BaseModel):
             return cls_(**record).dict(exclude_none=True, exclude_defaults=True, exclude_unset=True)
         except pydantic.ValidationError as validation_error:
             raise Exceptions.InvalidModel(str(validation_error))
+
 
 class DataSet:
 
@@ -170,3 +174,32 @@ class DataSet:
         if id_ is None:
             id_ = record.get("t", None)
         return id_
+
+
+class FixtureFactory:
+    file: str = "fixtures.json"
+    dt: int = 10000  # 10 seconds
+
+    def __init__(self):
+        _path = str(Path(__file__).resolve().parent)
+        _file = os.path.join(_path, self.file)
+        with open(_file) as fixtures:
+            self.fixtures = json.load(fixtures)
+
+        self.t0 = now()
+        self.i0 = int(0.9 * len(self.fixtures))
+        self.i = self.i0
+
+        t = self.t0
+        for i in range(self.i0, len(self.fixtures)):
+            self.fixtures[i]["t"] = t
+            t = t + self.dt
+
+    def historic(self):
+        return self.fixtures[0:self.i0+1]
+
+    def new(self):
+        self.i += 1
+        item = self.fixtures[self.i]
+        item["t"] = now()
+        return item
