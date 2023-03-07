@@ -1,13 +1,15 @@
-from typing import Dict, Optional
+from inspect import iscoroutinefunction as is_coroutine
+from typing import Optional
 from abc import ABC
-import threading
-import asyncio
 import logging
 
 from aleph_core.utils.local_storage import LocalStorage
 from aleph_core.utils.wait_one_step import WaitOneStep
+from aleph_core.utils.report_by_exception import ReportByException
+from aleph_core.utils.store_and_forward import StoreAndForward
+from aleph_core.utils.async_helper import AsyncHelper
 from aleph_core.utils.exceptions import Exceptions, Error
-from aleph_core.utils.data import DataSet
+from aleph_core.utils.data import RecordSet
 
 logger = logging.getLogger(__name__)
 
@@ -15,13 +17,20 @@ logger = logging.getLogger(__name__)
 class Connection(ABC):
     time_step = 10
     local_storage = LocalStorage()
+    async_helper = AsyncHelper()
     store_and_forward = False
+    report_by_exception = False
     multi_thread = False
 
     def __init__(self, client_id=""):
         self.client_id = client_id
-        self.__async_loop__ = None
         self.__subscribed_keys__ = set()
+        self.__report_by_exception__ = ReportByException(self.local_storage)
+        self.__store_and_forward__ = StoreAndForward(self.write, self.local_storage)
+
+    # ----------------------------------------------------------------------------------
+    # Main methods
+    # ----------------------------------------------------------------------------------
 
     def open(self):
         return
@@ -29,16 +38,16 @@ class Connection(ABC):
     def close(self):
         return
 
-    def read(self, key: str, **kwargs) -> Optional[DataSet]:
+    def read(self, key: str, **kwargs) -> Optional[RecordSet]:
         return None
 
-    def write(self, key: str, data: DataSet):
+    def write(self, key: str, data: RecordSet = None):
         return
 
     def is_open(self) -> bool:
         return True
 
-    def on_new_data(self, key: str, data: DataSet):
+    def on_new_data(self, key: str, data: RecordSet):
         """Callback function for when a new message arrives"""
         return
 
@@ -54,6 +63,10 @@ class Connection(ABC):
         """Callback function for when the connection is closed"""
         return
 
+    # ----------------------------------------------------------------------------------
+    # Dunder methods
+    # ----------------------------------------------------------------------------------
+
     def __enter__(self):
         self.open()
         return self
@@ -61,13 +74,9 @@ class Connection(ABC):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
-    def __run_on_async_thread__(self, coroutine):
-        if self.__async_loop__ is None:
-            logging.info("Starting async thread")
-            self.__async_loop__ = asyncio.new_event_loop()
-            threading.Thread(target=self.__async_loop__.run_forever, daemon=True).start()
-
-        asyncio.run_coroutine_threadsafe(coroutine, self.__async_loop__)
+    # ----------------------------------------------------------------------------------
+    # Open
+    # ----------------------------------------------------------------------------------
 
     async def _open_async(self, time_step):
         wait_one_step = WaitOneStep(time_step)
@@ -77,197 +86,191 @@ class Connection(ABC):
             current_state = self.is_open()
             if not current_state:
                 try:
-                    self.open()
+                    if is_coroutine(self.open):
+                        await self.open()
+                    else:
+                        self.open()
                     current_state = True
-                except:
+
+                except Exception as e:
+                    self.on_error(Error(e, client_id=self.client_id))
                     current_state = False
 
-            try:
-                if current_state and not previous_state:
-                    logger.info("Connected")
-                    self.on_connect()
-                    self._buffer_flush_all()
-                elif not current_state and previous_state:
-                    logger.info("Disconnected")
-                    self.on_disconnect()
+            if current_state and not previous_state:
+                self.on_connect()
+                if self.store_and_forward:
+                    if is_coroutine(self.write):
+                        errors = await self.__store_and_forward__.flush_all_async()
+                    else:
+                        errors = self.__store_and_forward__.flush_all()
 
-            except Exception as e:
-                logger.error("Failed on _open_async")
-                self.on_error(Error(e))
+                    for error in errors:
+                        error.args["client_id"] = self.client_id
+                        self.on_error(error)
+
+            elif not current_state and previous_state:
+                self.on_disconnect()
 
             previous_state = current_state
-            wait_one_step.wait()
+            await wait_one_step.async_wait()
 
     def open_async(self, time_step=None):
         """
         Executes the open function without blocking the main thread
         Calls is_connected on a loop and tries to reconnect if disconnected
         """
-        if time_step is None:
-            time_step = self.time_step
-        self.__run_on_async_thread__(self._open_async(time_step))
+        time_step = time_step or self.time_step
+        self.async_helper.run_coroutine_threadsafe(self._open_async(time_step))
 
-    def _subscribe(self, key, time_step):
+    # ----------------------------------------------------------------------------------
+    # Read
+    # ----------------------------------------------------------------------------------
+
+    def __subscribe_async(self, key, time_step):
         wait_one_step = WaitOneStep(time_step)
         while True:
-            try:
-                wait_one_step.wait()
-                if key not in self.__subscribed_keys__:
-                    break
-                data = self.safe_read(key)
-                if data is None or len(data) == 0:
-                    continue
-                self.on_new_data(key, data)
-            except Exception:
-                self.unsubscribe(key)
-                raise
+            wait_one_step.wait()
+            if key not in self.__subscribed_keys__:
+                break
+            data = self.safe_read(key)
+            if data is None or len(data) == 0:
+                continue
+            self.on_new_data(key, data)
 
     async def _subscribe_async(self, key, time_step):
         wait_one_step = WaitOneStep(time_step)
         while True:
-            try:
-                wait_one_step.wait()
-                if key not in self.__subscribed_keys__:
-                    break
-                data = self.safe_read(key)
-                if data is None or len(data) == 0:
-                    continue
-                self.on_new_data(key, data)
-            except Exception:
-                self.unsubscribe(key)
-                raise
+            await wait_one_step.async_wait()
+            if key not in self.__subscribed_keys__:
+                break
+
+            data = await self._safe_read(key)
+            if data is None or len(data) == 0:
+                continue
+            self.on_new_data(key, data)
 
     def subscribe_async(self, key, time_step=None):
-        """Executes the read function on a loop, without blocking the main thread"""
-        if time_step is None:
-            time_step = self.time_step
+        """Executes the safe_read function without blocking the main thread"""
         if key in self.__subscribed_keys__:
             return
+
+        time_step = time_step or self.time_step
         self.__subscribed_keys__.add(key)
 
-        if self.multi_thread:
-            logger.info("Creating subscribe_async thread for key %s", key)
-            threading.Thread(target=self._subscribe, args=(key, time_step,), daemon=True).start()
+        if self.multi_thread and not is_coroutine(self.safe_read):
+            self.async_helper.run_on_thread(self.__subscribe_async, key, time_step)
         else:
-            logger.info("Adding subscribe_async coroutine for key %s", key)
-            self.__run_on_async_thread__(self._subscribe_async(key, time_step))
-
-    async def _write_async(self, key, data):
-        self.safe_write(key, data)
-
-    def write_async(self, key: str, data: DataSet):
-        """
-        Executes the safe_write function without blocking the main thread
-        If the connection does not allow multithreading, we use the async thread
-        """
-        if self.multi_thread:
-            threading.Thread(target=self.safe_write, args=(key, data,), daemon=True).start()
-        else:
-            self.__run_on_async_thread__(self._write_async(key, data))
+            coroutine = self._subscribe_async(key, time_step)
+            self.async_helper.run_coroutine_threadsafe(coroutine)
 
     def unsubscribe(self, key: str):
+        """Reverse the effect of subscribe_async"""
         self.__subscribed_keys__.discard(key)
 
-    def safe_read(self, key: str, **kwargs) -> DataSet | None:
+    async def _safe_read(self, key: str, **kwargs) -> Optional[RecordSet]:
         try:
             if not self.is_open():
-                self.open()
-            data = self.read(key, **kwargs)
+                if is_coroutine(self.open):
+                    await self.open()
+                else:
+                    self.open()
+
+            if is_coroutine(self.read):
+                data = await self.read(key, **kwargs)
+            else:
+                data = self.read(key, **kwargs)
+
             if data is None:
                 raise Exceptions.InvalidKey("Reading function returned None")
-
             return data
 
         except Exception as e:
             self.on_error(Error(e, client_id=self.client_id, key=key, args=kwargs))
             return None
 
-    def safe_write(self, key: str, data: DataSet):
+    def safe_read(self, key: str, **kwargs) -> Optional[RecordSet]:
+        """
+        Tries to open the connection and read.
+        If an exception is raised, the on_error function is called.
+        """
         try:
-            # TODO: Report by exception
-            if not isinstance(data, DataSet):
-                data = DataSet(data)
+            if not self.is_open():
+                self.open()
+            data = self.read(key, **kwargs)
+            if data is None:
+                raise Exceptions.InvalidKey("Reading function returned None")
+            return data
+        except Exception as e:
+            self.on_error(Error(e, client_id=self.client_id, key=key, args=kwargs))
+            return None
+
+    # ----------------------------------------------------------------------------------
+    # Write
+    # ----------------------------------------------------------------------------------
+
+    async def _safe_write(self, key: str, data: RecordSet):
+        try:
+            if not isinstance(data, RecordSet):
+                data = RecordSet(data)
+            if self.report_by_exception:
+                data = self.__report_by_exception__.next(key, data)
             if len(data) == 0:
                 return
         except Exception as e:
-            raise
             self.on_error(Error(e, client_id=self.client_id, key=key, data=data))
 
         try:
             if not self.is_open():
-                self.open()
-            self._buffer_add_and_flush(key=key, data=data)
+                if is_coroutine(self.open):
+                    await self.open()
+                else:
+                    self.open()
+
+            if self.store_and_forward:
+                if is_coroutine(self.write):
+                    await self.__store_and_forward__.add_and_flush(key, data)
+                else:
+                    self.__store_and_forward__.add_and_flush_async(key, data)
+
+            else:
+                self.write(key, data)
         except Exception as e:
             self.on_error(Error(e, client_id=self.client_id, key=key, data=data))
 
-    def _buffer_name(self):
-        return self.__class__.__name__
+    def write_async(self, key: str, data: RecordSet):
+        """Executes the safe_write function without blocking the main thread"""
+        if self.multi_thread and not is_coroutine(self.safe_write):
+            self.async_helper.run_on_thread(self.safe_write, key, data)
+        else:
+            self.async_helper.run_coroutine_threadsafe(self._safe_write(key, data))
 
-    def _buffer_flush_all(self):
-        if not self.store_and_forward:
-            return
-        
-        buffer = self.local_storage.get(self._buffer_name(), {})
-        for key in buffer:
-            try:
-                self.write(key, DataSet(buffer.get(key)))
-                buffer[key] = []
-                self.local_storage.set(self._buffer_name(), buffer)
-            except:
-                continue
-
-    def _buffer_add_and_flush(self, key: str, data: DataSet):
-        if not self.store_and_forward:
-            self.write(key, data)
-            return
-        
-        buffer = self.local_storage.get(self._buffer_name(), {})
-        if key not in buffer:
-            buffer[key] = []
-        buffer[key] = buffer[key] + list(data)
-        self.local_storage.set(self._buffer_name(), buffer)
-        
-        self.write(key, DataSet(buffer.get(key)))
-        buffer[key] = []
-        self.local_storage.set(self._buffer_name(), buffer)
+    def safe_write(self, key: str, data: RecordSet):
+        """
+        Tries to open the connection and write.
+        If report_by_exception is enabled, only writes the difference with last call.
+        If store_and_forward is enabled, the buffer will be flushed on success.
+        If an exception is raised, the on_error function is called.
+        """
+        self.async_helper.run(self._safe_write(key, data))
 
 
 class AsyncConnection(Connection):
+    multi_thread = False
 
     async def open(self):
         return super().open()
-    
+
     async def close(self):
         return super().close()
-    
-    async def read(self, key: str, **kwargs) -> Optional[DataSet]:
+
+    async def read(self, key: str, **kwargs) -> Optional[RecordSet]:
         return super().read(key, **kwargs)
-    
-    async def write(self, key: str, data: DataSet):
+
+    async def write(self, key: str, data: RecordSet):
         return super().write(key, data)
 
-    async def safe_read(self, key: str, **kwargs) -> DataSet | None:
-        return super().safe_read(key, **kwargs)
-    
-    async def safe_write(self, key: str, data: DataSet):
-        return super().safe_write(key, data)
-    
-    async def _open_async(self, time_step):
-        pass # TODO
+    async def safe_read(self, key: str, **kwargs) -> RecordSet:
+        return await self._safe_read(key, **kwargs)
 
-    def _subscribe(self, key, time_step):
-        pass # TODO
-
-    async def _subscribe_async(self, key, time_step):
-        pass # TODO
-
-    async def _write_async(self, key, data):
-        await self.safe_write(key, data)
-    
-    async def _buffer_flush_all(self):
-        pass # TODO
-
-    async def _buffer_add_and_flush(self, key: str, data: DataSet):
-        pass # TODO
-
-
+    async def safe_write(self, key: str, data: RecordSet):
+        return await self._safe_write(key, data)

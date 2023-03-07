@@ -10,30 +10,54 @@ class DockerContainer(ABC):
     VOLUMES = {}
     PORTS = {}
     ENVIRONMENT = {}
-    WAIT_SECONDS = 5
+    WAIT_SECONDS = 4
 
     def __init__(self):
         self.client = docker.from_env()
         self.container = None
 
+        running_containers = self.client.containers.list(all=True)
+        for container in running_containers:
+            if container.name == self.name:
+                self.container = container
+                break
+
+    @property
+    def name(self) -> str:
+        return f'dk-{self.IMAGE.replace(":", "-").replace(".", "-")}'
+
+    @property
+    def running(self) -> bool:
+        self.container.reload()
+        if self.container is not None:
+            return self.container.attrs["State"]["Running"]
+        return False
+
     def run(self):
         if self.IMAGE is None:
             raise NotImplementedError
 
-        self.container = self.client.containers.run(
-            self.IMAGE,
-            command=self.COMMAND,
-            detach=True,
-            volumes=self.VOLUMES,
-            ports=self.PORTS,
-            environment=self.ENVIRONMENT,
-        )
+        if self.container is not None:
+            if self.running:
+                self.container.restart()
+                time.sleep(1)
 
-        if self.WAIT_SECONDS:
-            time.sleep(self.WAIT_SECONDS)
+        else:
+            self.container = self.client.containers.run(
+                self.IMAGE,
+                command=self.COMMAND,
+                name=self.name,
+                detach=True,
+                volumes=self.VOLUMES,
+                ports=self.PORTS,
+                environment=self.ENVIRONMENT,
+            )
+
+            if self.WAIT_SECONDS:
+                time.sleep(self.WAIT_SECONDS)
 
     def stop(self):
-        if self.container is not None:
+        if self.container is not None and self.running:
             self.container.stop()
 
 

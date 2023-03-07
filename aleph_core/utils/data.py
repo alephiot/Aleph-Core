@@ -1,10 +1,8 @@
 import pydantic
-import sqlmodel
 import json
 import os
 
 from pathlib import Path
-from sqlalchemy import Column, BigInteger
 
 from typing import Optional, Type, Any
 from uuid import uuid4
@@ -18,63 +16,49 @@ def generate_id():
     return str(uuid4())
 
 
-class TableModel(sqlmodel.SQLModel):
-    id_: Optional[str] = sqlmodel.Field(default_factory=generate_id, primary_key=True)
-    t: Optional[int] = sqlmodel.Field(default_factory=now, index=True, sa_column=Column(BigInteger()))
-    deleted_: Optional[bool] = sqlmodel.Field(default=False)
-
-    __table_args__ = {'extend_existing': True}
-
-
 class Model(pydantic.BaseModel):
     id_: Optional[str] = pydantic.Field(default_factory=generate_id, index=True)
     t: Optional[int] = pydantic.Field(default_factory=now, index=True)
 
     __key__: Optional[str] = None
-    __table__: Optional[Type[TableModel]] = None
     __optional__: Optional[Type[pydantic.BaseModel]] = None
 
-    def to_dict(self):
-        return self.dict(exclude_none=True, exclude_defaults=True)
-
-    @property
-    def key(self):
-        return self.__key__ if self.__key__ else None
-
-    @key.setter
-    def key(self, value: str):
-        self.__key__ = value
+    class Config:
+        use_enum_values = True
 
     @classmethod
-    def to_table_model(cls) -> Type[TableModel]:
-        if cls.__table__ is None:
-            cls.__table__ = type(cls.__name__, (TableModel, cls), {}, table=True)
-        return cls.__table__ 
-    
+    @property
+    def key(cls):
+        return cls.__key__ if cls.__key__ else None
+
     @classmethod
     def to_all_optionals_model(cls) -> Type[pydantic.BaseModel]:
         if cls.__optional__ is None:
-            cls.__optional__ = type(f'{cls.__name__}Optional', (cls,), {})
+            cls.__optional__ = type(f"{cls.__name__}Optional", (cls,), {})
             for field in cls.__optional__.__fields__:
                 cls.__optional__.__fields__[field].required = False
         return cls.__optional__
 
     @classmethod
-    def validate_record(cls, record: Record, exclude_unset=False) -> Record:
+    def validate_record(cls, record: Record):
         """
         Receives a dict and checks if it matches the model
         Otherwise it throws an InvalidModel error
         """
-        try:
-            cls_ = cls if not exclude_unset else cls.to_all_optionals_model()
-            return cls_(**record).dict(exclude_none=True, exclude_defaults=True, exclude_unset=True)
-        except pydantic.ValidationError as validation_error:
-            raise Exceptions.InvalidModel(str(validation_error))
+        cls(**record)
+
+    @classmethod
+    def validate_subrecord(cls, subrecord: Record):
+        cls_ = cls.to_all_optionals_model()
+        cls_(**subrecord)
 
 
-class DataSet:
-
-    def __init__(self, records: Optional[list[Record]] = None, model: Optional[Type[Model]] = None):
+class RecordSet:
+    def __init__(
+        self,
+        records: Optional[list[Record]] = None,
+        model: Optional[Type[Model]] = None,
+    ):
         self.model = model
         self._records: dict[Any, Record] = {}
 
@@ -83,7 +67,7 @@ class DataSet:
 
     @property
     def records(self):
-        return [self._return_record(record) for record in self._records.values()]
+        return [record for record in self._records.values()]
 
     @records.setter
     def records(self, records: list[Record]):
@@ -93,14 +77,14 @@ class DataSet:
     def update(self, records: Record | list[Record], sort=True):
         if not isinstance(records, list):
             records = [records]
-        
+
         for record in records:
             if self.model is None and isinstance(record, Model):
                 self.model = type(record)
 
             if not isinstance(record, dict):
                 record = dict(record)
-            
+
             if self.model is not None:
                 record = self.model(**record).dict()
             else:
@@ -111,7 +95,7 @@ class DataSet:
 
             self._records.update({self._get_record_id(record): record})
 
-        if sort: # TODO: test
+        if sort:
             items = self._records.items()
             sorted_items = sorted(items, key=lambda item: item[1].get("t"))
             self._records = {key: value for key, value in sorted_items}
@@ -127,47 +111,34 @@ class DataSet:
             if t == self._records[r].get("t"):
                 return self._records[r]
         return default
-        
-    def __getitem__(self, item):
+
+    def __getitem__(self, item) -> Record:
         return self.records[item]
-    
+
     def __setitem__(self, item, value):
         self.records[item] = value
 
-    def __iter__(self):
+    def __iter__(self) -> Record:
         for r in self._records:
-            yield self._return_record(self._records[r])
-            
+            yield self._records[r]
+
     def __len__(self):
         return len(self._records)
-    
+
     def __str__(self):
         records_str = "\n".join([str(record) for record in self._records.values()])
         if len(records_str):
             records_str = ":\n" + records_str
 
         return repr(self) + records_str
-    
+
     def __repr__(self):
         if self.model is None:
-            model_str = 'None'
+            model_str = "None"
         else:
             model_str = self.model.__name__
-            
+
         return f"DataSet<{model_str}>({len(self)})"
-
-    def most_recent(self, field, timestamp_threshold_in_seconds: Optional[int] = None) -> Value:
-        get_time_from_item = lambda item: item.get("t", 0) if item.get(field, None) is not None else 0
-        last_record = max(self._records.values(), key=get_time_from_item)
-
-        if timestamp_threshold_in_seconds is not None:
-            if now() - last_record.get("t", None) > timestamp_threshold_in_seconds:
-                return None
-        
-        return self._return_record(last_record)
-    
-    def _return_record(self, record: Record):
-        return record
 
     def _get_record_id(self, record: Record):
         id_ = record.get("id_", None)
@@ -196,9 +167,9 @@ class FixtureFactory:
             t = t + self.dt
 
     def historic(self):
-        return self.fixtures[0:self.i0+1]
+        return self.fixtures[0 : self.i0 + 1]
 
-    def new(self):
+    def next(self):
         self.i += 1
         item = self.fixtures[self.i]
         item["t"] = now()
