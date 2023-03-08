@@ -38,7 +38,7 @@ class DockerContainer(ABC):
             raise NotImplementedError
 
         if self.container is not None:
-            if self.running:
+            if not self.running:
                 self.container.restart()
                 time.sleep(1)
 

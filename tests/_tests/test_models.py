@@ -41,6 +41,13 @@ def test_model_can_create():
     assert obj.t is not None
 
 
+def test_model_add_id_on_create():
+    """Test the an unique id is assigned on creation"""
+    objA = AnotherModel(a="a", b=2)
+    objB = AnotherModel(a="a", b=2)
+    assert objA.id_ != objB.id_
+
+
 def test_model_can_parse_values():
     """Test the model can parse data types on creation"""
     obj = SomeModel(str_=3, int_="9", float_="8.0", bool_=0, enum_="Value A")

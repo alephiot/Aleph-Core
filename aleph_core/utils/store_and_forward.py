@@ -13,7 +13,9 @@ class StoreAndForward:
 
     LOCAL_STORAGE_KEY = "STORE_AND_FORWARD"
 
-    def __init__(self, name: str, write: Callable | Coroutine, local_storage: LocalStorage = None):
+    def __init__(
+        self, name: str, write: Callable | Coroutine, local_storage: LocalStorage = None
+    ):
         self.name = name
         self.local_storage = local_storage or LocalStorage()
         self.write = write
@@ -23,6 +25,10 @@ class StoreAndForward:
         return f"{self.LOCAL_STORAGE_KEY}_{self.name}"
 
     def flush_all(self) -> list[Error]:
+        """
+        Tries to call the write function for all keys in the buffer.
+        Returns a list of the errors raised for each key.
+        """
         try:
             buffer = self.local_storage.get(self.local_storage_key, {})
         except Exception as e:
@@ -41,6 +47,10 @@ class StoreAndForward:
         return errors
 
     def add_and_flush(self, key: str, data: RecordSet):
+        """
+        Add data to buffer and try to write.
+        If it fails, it raises an exeception.
+        """
         buffer = self.local_storage.get(self.local_storage_key, {})
         if key not in buffer:
             buffer[key] = []

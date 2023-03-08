@@ -85,6 +85,8 @@ class RecordSet:
             if not isinstance(record, dict):
                 record = dict(record)
 
+            record = record.copy()
+
             if self.model is not None:
                 record = self.model(**record).dict()
             else:

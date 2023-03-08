@@ -2,6 +2,7 @@
 notes.md
 .vscode/
 .idea/
+lab/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

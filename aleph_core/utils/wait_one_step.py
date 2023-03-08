@@ -32,7 +32,10 @@ class WaitOneStep:
             time.sleep(c - time.time())
         else:
             delta = time.time() - self.t
-            if delta > self.time_step: return
+            if delta > self.time_step:
+                self.t = time.time()
+                return
+
             time.sleep(self.time_step - delta)
             self.t = time.time()
 
@@ -44,10 +47,13 @@ class WaitOneStep:
 
         if isinstance(self.time_step, str):
             c = self.cron.get_next()
-            time.sleep(c - time.time())
+            await asyncio.sleep(c - time.time())
 
         else:
             delta = time.time() - self.t
-            if delta > self.time_step: return
+            if delta > self.time_step:
+                self.t = time.time()
+                return
+
             await asyncio.sleep(self.time_step - delta)
             self.t = time.time()
