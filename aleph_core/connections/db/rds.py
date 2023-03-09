@@ -2,40 +2,31 @@ import sqlalchemy
 import sqlmodel
 import json
 
-from aleph_core import Connection
-from aleph_core import Exceptions
-from aleph_core import Model
+from sqlalchemy.orm import sessionmaker, scoped_session, query
+from typing import Optional
+
+from aleph_core.connections.connection import Connection
+from aleph_core.utils.exceptions import Exceptions
+from aleph_core.utils.data import TableModel
+from aleph_core.utils.data import Model
 
 
 class RDSConnection(Connection):
-    url: str = ""
-    models: dict[str, Model] = {}
+    url: str
+    models: dict[str, Model]
 
     def __init__(self, client_id=""):
         super().__init__(client_id)
-        self.__tables__ = {}
+        self.__tables__ = {}  # map key: table
         self.__engine__ = None
 
-        if len(self.models) == 0:
-            raise Exception("The Relational Database needs models to work properly")
-
-        if isinstance(self.models, list):
-            _models = {}
-            for model in self.models:
-                if model.__key__ is None:
-                    raise Exceptions.InvalidModel(f"Missing __key__ on model '{model.__name__}'")
-                _models[model.__key__] = model
-
-            self.models = _models
-                
-        for key in self.models:
-            self.__tables__[key] = self.models[key].to_table_model()
+        for key, model in self.models.items():
+            self.__tables__[key] = model.to_sqlalchemy_table()
 
     def open(self):
-        if self.__engine__ is not None:
-            return
-        self.__engine__ = sqlmodel.create_engine(self.url)
-        sqlmodel.SQLModel.metadata.create_all(self.__engine__)
+        if self.__engine__ is None:
+            self.__engine__ = sqlalchemy.create_engine(self.url)
+            sqlmodel.SQLModel.metadata.create_all(self.__engine__)
 
     def close(self):
         if self.__engine__ is not None:
@@ -44,31 +35,28 @@ class RDSConnection(Connection):
     def is_open(self):
         return self.__engine__ is not None
 
-    def get_session(self):
+    def get_table(self, key: str) -> Optional[TableModel]:
+        return self.__tables__.get(key)
+
+    def get_scoped_session(self):
         if self.__engine__ is None:
             self.open()
-        return sqlmodel.Session(self.__engine__)
+        Session = scoped_session(sessionmaker(self.__engine__))
+        return Session()
 
-    def run_sql_query(self, query):
-        with sqlmodel.Session(self.__engine__) as session:
-            result = session.exec(sqlmodel.text(query))
-            try:
-                result = result.all()
-            except sqlalchemy.exc.ResourceClosedError:
-                result = None
-
-            session.commit()
-        return result
+    def query(self, key: str) -> query.Query:
+        """Query the database"""
+        table = self.get_table(key)
+        if table is None:
+            raise Exceptions.InvalidKey(f"Cannot match '{key}' with a model")
+        return self.get_scoped_session().query(table)
 
     def read(self, key, **kwargs):
-        
-        if key not in self.__tables__:
+        table = self.get_table(key)
+        if table is None:
             raise Exceptions.InvalidKey(f"Cannot match '{key}' with a model")
-
-        if self.__engine__ is None:
+        if not self.is_open():
             raise Exceptions.ConnectionNotOpen()
-
-        table = self.__tables__.get(key)
 
         since = kwargs.get("since", None)
         until = kwargs.get("until", None)
@@ -79,7 +67,7 @@ class RDSConnection(Connection):
 
         result = []
 
-        with sqlmodel.Session(self.__engine__) as session:
+        with self.get_scoped_session() as session:
             statement = session.query(table)
             statement = statement.where(getattr(table, "deleted_") != True)
 
@@ -87,10 +75,8 @@ class RDSConnection(Connection):
                 statement = statement.filter(getattr(table, "t") >= since)
             if until:
                 statement = statement.filter(getattr(table, "t") < until)
-
             if where:
                 statement = self.__filter_statement__(table, statement, where)
-
             if order:
                 if order[0] == "-":
                     statement = statement.order_by(getattr(table, order[1:]).desc())
@@ -111,16 +97,13 @@ class RDSConnection(Connection):
         return result
 
     def write(self, key, data):
-
-        if key not in self.__tables__:
+        table = self.get_table(key)
+        if key is None:
             raise Exceptions.InvalidKey(f"Cannot match '{key}' with a model")
-
-        if self.__engine__ is None:
+        if not self.is_open():
             raise Exceptions.ConnectionNotOpen()
 
-        table = self.__tables__.get(key)
-
-        with sqlmodel.Session(self.__engine__) as session:
+        with self.get_scoped_session() as session:
             for record in data:
                 instance = None
                 if "id_" in record and record["id_"]:
@@ -134,23 +117,17 @@ class RDSConnection(Connection):
                 session.add(instance)
             session.commit()
 
-    def delete(self, key, id_):
-        # TODO
-        self.write(key, [{"id_": id_, "deleted_": True}])
-
     def __filter_statement__(self, table, statement, where):
         if isinstance(where, str):
             where = json.loads(where)
-
         if not isinstance(where, dict):
-            raise Exception("Filter needs to be a dict")
+            raise Exceptions.InvalidArgs(f"Filter '{where}' is not a dict")
 
         and_conditions = self.__filter_to_conditions__(table, where)
         statement = statement.filter(sqlalchemy.and_(*and_conditions))
         return statement
 
     def __filter_to_conditions__(self, table, where: dict):
-        # TODO: Decide on filter
         conditions = []
         for field in where:
             condition = where[field]

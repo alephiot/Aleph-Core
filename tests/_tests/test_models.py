@@ -1,5 +1,6 @@
 import pytest
 
+from typing import Optional
 from aleph_core import Model
 from aleph_core import Exceptions
 from enum import Enum
@@ -16,7 +17,7 @@ class SomeModel(Model):
     int_: int
     float_: float
     bool_: bool
-    enum_: SomeEnum
+    enum_: Optional[SomeEnum]
     default_none: str = None
     default_one: int = 1
 
@@ -93,11 +94,22 @@ def test_model_can_set_key():
 
 def test_model_can_validate_record():
     """Test a record can be validated with a model"""
-    AnotherModel.validate_record({"a": "hello", "b": 2})
-    AnotherModel.validate_subrecord({"a": "no b"})
+
+    record = {"str_": "x", "int_": "1", "float_": "3.2", "bool_": 1}
+    validated_record = SomeModel.validate_record(record)
+    assert validated_record == {
+        "str_": "x",
+        "int_": 1,
+        "float_": 3.2,
+        "bool_": True,
+    }
+
+    subrecord = {"float_": "8.8"}
+    validated_subrecord = SomeModel.validate_subrecord(subrecord)
+    assert validated_subrecord == {"float_": 8.8}
 
     with pytest.raises(Exceptions.ModelValidationError):
-        AnotherModel.validate({"a": "no b"})
+        SomeModel.validate({"float_": "8.8"})
 
     with pytest.raises(Exceptions.ModelValidationError):
-        AnotherModel.validate_subrecord({"b": "unparseable"})
+        SomeModel.validate_subrecord({"float_": "unparseable"})

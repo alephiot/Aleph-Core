@@ -34,6 +34,9 @@ class Exceptions:
     class InvalidRecord(Exception):
         pass
 
+    class InvalidArgs(Exception):
+        pass
+
     # Alias
     ModelValidationError = pydantic.error_wrappers.ValidationError
 

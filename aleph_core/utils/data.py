@@ -1,36 +1,47 @@
 import pydantic
+import sqlmodel
 import json
 import os
 
-from pathlib import Path
-
-from typing import Optional, Type, Any
 from uuid import uuid4
+from pathlib import Path
+from typing import Optional, Type, Any
+from sqlalchemy import Column, BigInteger
 
+from aleph_core.utils.typing import Record
 from aleph_core.utils.time import now
-from aleph_core.utils.exceptions import Exceptions
-from aleph_core.utils.typing import Record, Value
 
 
 def generate_id():
     return str(uuid4())
 
 
+class TableModel(sqlmodel.SQLModel):
+    id_: Optional[str] = sqlmodel.Field(default_factory=generate_id, primary_key=True)
+    t: Optional[int] = sqlmodel.Field(
+        default_factory=now, index=True, sa_column=Column(BigInteger())
+    )
+    deleted_: Optional[bool] = sqlmodel.Field(default=False)
+
+    __table_args__ = {"extend_existing": True}
+
+
 class Model(pydantic.BaseModel):
     id_: Optional[str] = pydantic.Field(default_factory=generate_id, index=True)
     t: Optional[int] = pydantic.Field(default_factory=now, index=True)
 
-    __key__: Optional[str] = None
     __optional__: Optional[Type[pydantic.BaseModel]] = None
+    __table__: Optional[Type[TableModel]] = None
 
     class Config:
         use_enum_values = True
 
     @classmethod
-    @property
-    def key(cls):
-        return cls.__key__ if cls.__key__ else None
-
+    def to_sqlalchemy_table(cls) -> Type[TableModel]:
+        if cls.__table__ is None:
+            cls.__table__ = type(cls.__name__, (TableModel, cls), {}, table=True)
+        return cls.__table__ 
+    
     @classmethod
     def to_all_optionals_model(cls) -> Type[pydantic.BaseModel]:
         if cls.__optional__ is None:
@@ -40,17 +51,20 @@ class Model(pydantic.BaseModel):
         return cls.__optional__
 
     @classmethod
-    def validate_record(cls, record: Record):
+    def validate_record(cls, record: Record) -> Record:
         """
-        Receives a dict and checks if it matches the model
-        Otherwise it throws an InvalidModel error
+        Checks if record fits the model
         """
-        cls(**record)
+        return cls(**record).dict(exclude_defaults=True, exclude_unset=True)
 
     @classmethod
-    def validate_subrecord(cls, subrecord: Record):
+    def validate_subrecord(cls, subrecord: Record) -> Record:
+        """
+        Checks if subrecord fits the model (ignoring fields that are not present)
+        """
         cls_ = cls.to_all_optionals_model()
-        cls_(**subrecord)
+        print(cls_(**subrecord))
+        return cls_(**subrecord).dict(exclude_defaults=True, exclude_unset=True)
 
 
 class RecordSet:
