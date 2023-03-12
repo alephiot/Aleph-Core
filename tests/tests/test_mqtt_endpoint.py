@@ -5,7 +5,7 @@ from unittest import TestCase
 from .utils.docker import MosquittoContainer
 
 from aleph_core import Connection
-from aleph_core.connections.namespace.mqtt import MqttNamespaceConnection
+from aleph_core.connections.mqtt.namespace import MqttNamespaceConnection
 from aleph_core.services.endpoint.mqtt import MqttEndpoint
 from aleph_core.utils.mqtt_client import MqttClient
 
@@ -57,7 +57,7 @@ class ServiceTestCase(TestCase):
         threading.Thread(target=test_endpoint.run, daemon=True).start()
 
         time.sleep(2)
-        key_ = KEY.replace('.', '/')
+        key_ = KEY.replace(".", "/")
         self.mqtt_client.subscribe_once(f"alv1/1234/{key_}")
 
         args_ = {}

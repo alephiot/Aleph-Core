@@ -5,10 +5,6 @@ from aleph_core.utils.local_storage import LocalStorage
 
 
 class ReportByException:
-    """
-    TODO
-    """
-
     LOCAL_STORAGE_KEY = "REPORT_BY_EXCEPTION"
     MAX_RECORDS_SIZE = 100
 

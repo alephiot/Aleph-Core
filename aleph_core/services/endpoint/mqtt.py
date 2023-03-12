@@ -1,7 +1,7 @@
 import logging
 
 from aleph_core import Service
-from aleph_core.connections.namespace.mqtt import MqttNamespaceConnection
+from aleph_core.connections.mqtt.namespace import MqttNamespaceConnection
 
 logger = logging.getLogger(__name__)
 

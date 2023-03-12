@@ -37,11 +37,15 @@ class Model(pydantic.BaseModel):
         use_enum_values = True
 
     @classmethod
+    def get_fields(cls) -> dict[str, pydantic.fields.ModelField]:
+        return cls.__fields__
+
+    @classmethod
     def to_sqlalchemy_table(cls) -> Type[TableModel]:
         if cls.__table__ is None:
             cls.__table__ = type(cls.__name__, (TableModel, cls), {}, table=True)
-        return cls.__table__ 
-    
+        return cls.__table__
+
     @classmethod
     def to_all_optionals_model(cls) -> Type[pydantic.BaseModel]:
         if cls.__optional__ is None:
@@ -63,7 +67,6 @@ class Model(pydantic.BaseModel):
         Checks if subrecord fits the model (ignoring fields that are not present)
         """
         cls_ = cls.to_all_optionals_model()
-        print(cls_(**subrecord))
         return cls_(**subrecord).dict(exclude_defaults=True, exclude_unset=True)
 
 
@@ -89,6 +92,7 @@ class RecordSet:
         self.update(records)
 
     def update(self, records: Record | list[Record], sort=True):
+        """ """
         if not isinstance(records, list):
             records = [records]
 
@@ -109,23 +113,26 @@ class RecordSet:
                 if "id_" not in record:
                     record["id_"] = generate_id()
 
-            self._records.update({self._get_record_id(record): record})
+            record_id = record.get("id_", record.get("t"))
+            self._records.update({record_id: record})
 
         if sort:
             items = self._records.items()
             sorted_items = sorted(items, key=lambda item: item[1].get("t"))
             self._records = {key: value for key, value in sorted_items}
 
-    def get_by_id(self, id_, default=None):
-        for r in self._records:
-            if id_ == self._records[r].get("id_"):
-                return self._records[r]
+    def get_by_id(self, id_, default=None) -> Optional[Record]:
+        """Get the record that matches the id_"""
+        for record in self._records.values():
+            if id_ == record.get("id_"):
+                return record
         return default
 
-    def get_by_t(self, t, default=None):
-        for r in self._records:
-            if t == self._records[r].get("t"):
-                return self._records[r]
+    def get_by_t(self, t, default=None) -> Optional[Record]:
+        """Get the record that matches the timestamp"""
+        for record in self._records.values():
+            if t == record.get("t"):
+                return record
         return default
 
     def __getitem__(self, item) -> Record:
@@ -141,52 +148,13 @@ class RecordSet:
     def __len__(self):
         return len(self._records)
 
+    def __repr__(self):
+        model_str = self.model.__name__ if self.model is not None else "None"
+        return f"DataSet<{model_str}>({len(self)})"
+
     def __str__(self):
         records_str = "\n".join([str(record) for record in self._records.values()])
         if len(records_str):
             records_str = ":\n" + records_str
 
         return repr(self) + records_str
-
-    def __repr__(self):
-        if self.model is None:
-            model_str = "None"
-        else:
-            model_str = self.model.__name__
-
-        return f"DataSet<{model_str}>({len(self)})"
-
-    def _get_record_id(self, record: Record):
-        id_ = record.get("id_", None)
-        if id_ is None:
-            id_ = record.get("t", None)
-        return id_
-
-
-class FixtureFactory:
-    file: str = "fixtures.json"
-    dt: int = 10000  # 10 seconds
-
-    def __init__(self):
-        _path = str(Path(__file__).resolve().parent)
-        _file = os.path.join(_path, self.file)
-        with open(_file) as fixtures:
-            self.fixtures = json.load(fixtures)
-
-        self.t0 = now()
-        self.i0 = int(0.9 * len(self.fixtures))
-        self.i = self.i0
-
-        t = self.t0
-        for i in range(self.i0, len(self.fixtures)):
-            self.fixtures[i]["t"] = t
-            t = t + self.dt
-
-    def historic(self):
-        return self.fixtures[0 : self.i0 + 1]
-
-    def next(self):
-        self.i += 1
-        item = self.fixtures[self.i]
-        item["t"] = now()
-        return item
