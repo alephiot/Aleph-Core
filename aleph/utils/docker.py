@@ -1,5 +1,5 @@
-import logging
 import docker
+import logging
 from docker.errors import NotFound
 
 
@@ -28,5 +28,7 @@ class DockerManager:
         """
         name = "MOSQUITTO"
         image = "eclipse-mosquitto"
-        ports = {'1883': 1883}
-        self.run(name, image, ports=ports)
+        ports = {"1883": 1883}
+        config_file = __file__.replace("docker.py", "mosquitto.conf")
+        volumes = {config_file: {"bind": "/mosquitto/config/mosquitto.conf", "mode": "rw"}}
+        self.run(name, image, ports=ports, volumes=volumes)

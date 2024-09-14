@@ -17,7 +17,7 @@ class MqttClient:
 
         self.on_connect: Callable = None  # callback function()
         self.on_disconnect: Callable = None  # callback function()
-        self.on_new_message: Callable[[str, str]] = None  # callback function(topic, message)
+        self.on_message: Callable[[str, str]] = None  # callback function(topic, message)
 
         self.qos = kwargs.get("qos", 1)
         self.keepalive = kwargs.get("keepalive", 10)
@@ -60,7 +60,7 @@ class MqttClient:
         if self.on_disconnect is not None:
             self.on_disconnect()
 
-    def __on_new_message__(self, client, userdata, msg):
+    def __on_message__(self, client, userdata, msg):
         topic = str(msg.topic)
         message = str(msg.payload.decode())
 
@@ -72,8 +72,8 @@ class MqttClient:
             return
         self.__subscribe_topics_once__.discard(topic)
 
-        if self.on_new_message is not None:
-            self.on_new_message(topic, message)
+        if self.on_message is not None:
+            self.on_message(topic, message)
 
     def __setup__(self):
         if self.client is not None:
@@ -83,7 +83,7 @@ class MqttClient:
         self.client.username_pw_set(username=self.username, password=self.password)
         self.client.on_connect = self.__on_connect__
         self.client.on_disconnect = self.__on_disconnect__
-        self.client.on_message = self.__on_new_message__
+        self.client.on_message = self.__on_message__
 
         if self.tls_enabled:
             self.client.tls_set(
