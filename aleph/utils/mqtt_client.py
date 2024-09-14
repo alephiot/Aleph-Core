@@ -1,11 +1,11 @@
+from typing import Callable, Optional
 import paho.mqtt.client as mqtt
-from typing import Optional
 import time
 
 
 class MqttClient:
     """
-    Wrapper around pago mqtt client
+    Wrapper around paho mqtt client
     """
 
     def __init__(self, **kwargs):
@@ -15,9 +15,9 @@ class MqttClient:
         self.username = kwargs.get("username", "")
         self.password = kwargs.get("password", "")
 
-        self.on_connect = None  # callback function()
-        self.on_disconnect = None  # callback function()
-        self.on_new_message = None  # callback function(topic, message)
+        self.on_connect: Callable = None  # callback function()
+        self.on_disconnect: Callable = None  # callback function()
+        self.on_new_message: Callable[[str, str]] = None  # callback function(topic, message)
 
         self.qos = kwargs.get("qos", 1)
         self.keepalive = kwargs.get("keepalive", 10)
@@ -44,7 +44,7 @@ class MqttClient:
         self.connected = True
         self.connecting = False
 
-        for topic in self.__subscribe_topics__ :
+        for topic in self.__subscribe_topics__:
             self.client.subscribe(topic, qos=self.qos)
 
         if self.birth_topic is not None and self.birth_message is not None:
@@ -65,12 +65,11 @@ class MqttClient:
         message = str(msg.payload.decode())
 
         if (
-            topic not in self.__subscribe_topics__ and
-            topic not in self.__subscribe_topics_once__ and
-            True not in [topic.startswith(t[:-1]) for t in self.__subscribe_topics__ ]
+            topic not in self.__subscribe_topics__
+            and topic not in self.__subscribe_topics_once__
+            and True not in [topic.startswith(t[:-1]) for t in self.__subscribe_topics__]
         ):
             return
-
         self.__subscribe_topics_once__.discard(topic)
 
         if self.on_new_message is not None:
@@ -88,9 +87,7 @@ class MqttClient:
 
         if self.tls_enabled:
             self.client.tls_set(
-                ca_certs=self.ca_cert,
-                certfile=self.client_cert,
-                keyfile=self.client_key
+                ca_certs=self.ca_cert, certfile=self.client_cert, keyfile=self.client_key
             )
 
         if self.last_will_topic and self.last_will_topic:
@@ -100,7 +97,7 @@ class MqttClient:
                 qos=1,
             )
 
-    def connect(self, timeout=10):
+    def connect(self, timeout: int = 10):
         if self.connected or self.connecting:
             return False
 
@@ -148,7 +145,7 @@ class MqttClient:
         self.client = None
         return True
 
-    def publish(self, topic: str, payload: str, qos=None):
+    def publish(self, topic: str, payload: str, qos: Optional[int] = None):
         msg_info = self.client.publish(topic, payload, qos if qos else self.qos)
         return msg_info
 
@@ -162,5 +159,5 @@ class MqttClient:
         self.__subscribe_topics_once__.discard(topic)
 
     def subscribe_once(self, topic):
-        self.client.subscribe(topic)
         self.__subscribe_topics_once__.add(topic)
+        self.client.subscribe(topic)

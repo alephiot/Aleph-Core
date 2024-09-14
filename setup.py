@@ -1,12 +1,13 @@
 from setuptools import setup
 
+
 setup(
-    name='aleph-core',
+    name='aleph',
     version='1.0',
-    packages=['aleph_core'],
+    packages=['aleph'],
     url='https://github.com/alephiot/aleph-core',
     license='MIT',
-    author='x',
+    author='Aleph',
     author_email='alephiot@gmail.com',
-    description='Aleph Core'
+    description='Aleph'
 )
