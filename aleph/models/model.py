@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Type
 from pydantic import BaseModel, Field
 from uuid import uuid4
 from time import time
@@ -21,3 +21,16 @@ def current_timestamp() -> int:
 class Model(BaseModel):
     id_: Optional[str] = Field(default_factory=generate_id)
     t: Optional[int] = Field(default_factory=current_timestamp)
+
+    __optional__: Optional[Type[BaseModel]] = None
+
+    @classmethod
+    def to_all_optionals_model(cls) -> Type[BaseModel]:
+        """
+        Creates a new model with the same fields, but all fields are optional.
+        """
+        if cls.__optional__ is None:
+            cls.__optional__ = type(f"{cls.__name__}Optional", (cls,), {})
+            for field in cls.__optional__.__fields__:
+                cls.__optional__.__fields__[field].required = False
+        return cls.__optional__

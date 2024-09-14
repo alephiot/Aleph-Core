@@ -1,69 +1,56 @@
 from typing import List, Optional, Type
 from aleph.models.model import Model
+from aleph.utils.time import current_timestamp
 
 Value = str | float | int | bool | None
 Record = dict[str, Value]
 
 
 class RecordSet:
-    def __init__(
-        self,
-        records: Optional[List[Record]] = None,
-        model: Optional[Type[Model]] = None,
-    ):
+    def __init__(self, model: Optional[Type[Model]] = None):
         self.model = model
-        self._records: dict[Any, Record] = {}
+        self.records: List[Record] = []
 
-        if records is not None:
-            self.update(records)
+    def project(self) -> List[Record]:
+        """
+        Project all records with the same id_ to the latest state. This will combine the
+        fields of all records with the same id_ into a single record.
+        """
+        records = sorted(self.records, key=lambda r: r.get("t"))
+        projection = {}
+        for record in records:
+            id_ = record.get("id_")
+            if id_ not in projection:
+                projection[id_] = {}
+            projection[id_].update(record)
+        return list(projection.values())
 
-    @property
-    def records(self):
-        return [record for record in self._records.values()]
+    def update(self, records: Record | List[Record] | Model | List[Model]) -> "RecordSet":
+        """
+        Returns a new record set with the records updated
+        """
+        now = current_timestamp()
+        model = self.model.to_all_optionals_model() if self.model else None
+        new_records = {(r["t"], r["id_"]): r for r in self.records}
 
-    @records.setter
-    def records(self, records: list[Record]):
-        self._records = {}
-        self.update(records)
-
-    def update(self, records: Record | list[Record], sort=True):
-        """ """
         if not isinstance(records, list):
             records = [records]
 
         for record in records:
-            if self.model is None and isinstance(record, Model):
-                self.model = type(record)
+            if model and not isinstance(record, model):
+                record = model(**record).dict()
 
-            if not isinstance(record, dict):
-                record = dict(record)
-
+            assert isinstance(record, dict)
             record = record.copy()
+            record["t"] = record.get("t", now)
+            record["id_"] = record.get("id_")
 
-            if self.model is not None:
-                record = self.model(**record).dict()
-            else:
-                if "t" not in record:
-                    record["t"] = now()
-                if "id_" not in record:
-                    record["id_"] = generate_id()
+            record_id = (record["t"], record["id_"])
+            new_records[record_id] = record
 
-            record_id = record.get("id_", record.get("t"))
-            self._records.update({record_id: record})
-
-        if sort:
-            items = self._records.items()
-            sorted_items = sorted(items, key=lambda item: item[1].get("t"))
-            self._records = {key: value for key, value in sorted_items}
-
-    def get(self, id_, default=None) -> Optional[Record]:
-        """
-        Get the record that matches the id_
-        """
-        for record in self._records.values():
-            if id_ == record.get("id_"):
-                return record
-        return default
+        record_set = RecordSet(self.model)
+        record_set.records = list(sorted(new_records.values(), key=lambda r: r.get("t")))
+        return record_set
 
     def __getitem__(self, item) -> Record:
         return self.records[item]
@@ -72,19 +59,15 @@ class RecordSet:
         self.records[item] = value
 
     def __iter__(self) -> Record:
-        for r in self._records:
-            yield self._records[r]
+        for i in range(len(self.records)):
+            yield self.records[i]
 
-    def __len__(self):
-        return len(self._records)
+    def __len__(self) -> int:
+        return len(self.records)
 
-    def __repr__(self):
-        model_str = self.model.__name__ if self.model is not None else "None"
-        return f"DataSet<{model_str}>({len(self)})"
+    def __repr__(self) -> str:
+        model_name = self.model.__name__ if self.model else ""
+        return f"DataSet<{model_name}>({len(self)})"
 
-    def __str__(self):
-        records_str = "\n".join([str(record) for record in self._records.values()])
-        if len(records_str):
-            records_str = ":\n" + records_str
-
-        return repr(self) + records_str
+    def __str__(self) -> str:
+        return self.__repr__()

@@ -97,7 +97,11 @@ class MqttClient:
                 qos=1,
             )
 
-    def connect(self, timeout: int = 10):
+    def connect(self, timeout: int = 10) -> bool:
+        """
+        Connect to the broker. This is a blocking call, and will retry until it connects or times
+        out. It returns a boolean indicating if the connection was successful.
+        """
         if self.connected or self.connecting:
             return False
 
@@ -112,7 +116,7 @@ class MqttClient:
                 self.client.loop()
                 if 0 < timeout < time.time() - t0:
                     self.connecting = False
-                    raise Exception(f"Mqtt Client (client_id={self.client_id}) failed to connect")
+                    raise TimeoutError(f"Mqtt Client (id: {self.client_id}) failed to connect")
 
         except Exception:
             self.connecting = False
@@ -122,6 +126,9 @@ class MqttClient:
         return True
 
     def connect_async(self):
+        """
+        Same as connect, but non-blocking.
+        """
         if self.connected or self.connecting:
             return False
 
@@ -137,7 +144,10 @@ class MqttClient:
 
         return True
 
-    def disconnect(self):
+    def disconnect(self) -> None:
+        """
+        Disconnect from the broker
+        """
         if self.client is None:
             return False
 
@@ -145,19 +155,65 @@ class MqttClient:
         self.client = None
         return True
 
-    def publish(self, topic: str, payload: str, qos: Optional[int] = None):
+    def publish(self, topic: str, payload: str, qos: Optional[int] = None) -> None:
+        """
+        Publish a message to a topic. Raises a runtime error if the message is not published.
+        """
         msg_info = self.client.publish(topic, payload, qos if qos else self.qos)
-        return msg_info
+        if msg_info.rc == 1:
+            raise RuntimeError("Connection refused, unacceptable protocol version (r = 1)")
+        elif msg_info.rc == 2:
+            raise RuntimeError("Connection refused, identifier rejected (r = 2)")
+        elif msg_info.rc == 3:
+            raise RuntimeError("Connection refused, server unavailable (r = 3)")
+        elif msg_info.rc == 4:
+            raise RuntimeError("Connection refused, bad username or password (r = 4)")
+        elif msg_info.rc == 5:
+            raise RuntimeError("Connection refused, not authorized (r = 5)")
+        elif msg_info.rc > 0:
+            raise RuntimeError(f"Mqtt error (r = {msg_info.rc})")
 
-    def subscribe(self, topic):
+    def subscribe(self, topic: str) -> None:
+        """
+        Subscribe to a topic
+        """
         self.client.subscribe(topic, qos=self.qos)
         self.__subscribe_topics__.add(topic)
 
-    def unsubscribe(self, topic):
+    def unsubscribe(self, topic: str) -> None:
+        """
+        Unsubscribe from a topic
+        """
         self.client.unsubscribe(topic)
         self.__subscribe_topics__.discard(topic)
         self.__subscribe_topics_once__.discard(topic)
 
-    def subscribe_once(self, topic):
+    def subscribe_once(self, topic: str) -> None:
+        """
+        Subscribe to a topic and disconnect after receiving a message
+        """
         self.__subscribe_topics_once__.add(topic)
         self.client.subscribe(topic)
+
+
+class MqttUtils:
+    ALEPH_V1_PROTOCOL = "alv1"
+
+    @classmethod
+    def topic_to_namespace_key(cls, topic: str) -> str:
+        """
+        Derive a namespace key from a topic, according to the Aleph v1 protocol
+        """
+        topic = str(topic)
+        if topic.startswith(cls.ALEPH_V1_PROTOCOL) and len(topic) > 7:
+            s_index = topic.index("/", 5) + 1
+            topic = topic[s_index:]
+        return topic.replace("/", ".")
+
+    @classmethod
+    def namespace_key_to_topic(cls, key: str, verb: str = "w") -> str:
+        """
+        Derive a topic from a namespace key, according to the Aleph v1 protocol
+        """
+        assert verb in ["w", "r", "c"], f"Invalid verb '{verb}'"
+        return f"{cls.ALEPH_V1_PROTOCOL}/{verb}/{str(key).replace('.', '/')}"

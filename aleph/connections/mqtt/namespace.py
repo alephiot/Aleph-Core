@@ -59,19 +59,6 @@ class MqttNamespaceConnection(Connection):
     def write(self, key, data):
         msg_info = self.client.publish(self.key_to_topic(key), self.data_to_mqtt_message(data))
 
-        if msg_info.rc == 1:
-            raise Exception("Connection refused, unacceptable protocol version (r = 1)")
-        elif msg_info.rc == 2:
-            raise Exception("Connection refused, identifier rejected (r = 2)")
-        elif msg_info.rc == 3:
-            raise Exception("Connection refused, server unavailable (r = 3)")
-        elif msg_info.rc == 4:
-            raise Exception("Connection refused, bad username or password (r = 4)")
-        elif msg_info.rc == 5:
-            raise Exception("Connection refused, not authorized (r = 5)")
-        elif msg_info.rc > 0:
-            raise Exception(f"Mqtt error (r = {msg_info.rc})")
-
     def is_open(self):
         return self.client and self.client.connected
 
@@ -111,17 +98,21 @@ class MqttNamespaceConnection(Connection):
         self.client.on_new_message = self.__on_new_message__
 
     def __send_read_request__(self, key, **kwargs):
-        request = {'t': time.time(), 'response_code': str(randint(0, 999999999))}
+        request = {"t": time.time(), "response_code": str(randint(0, 999999999))}
         request.update(kwargs)
-        self.client.subscribe_once(self.key_to_topic(key, request['response_code']))
-        self.client.publish(self.key_to_topic(key, 'r'), self.data_to_mqtt_message(request))
+        self.client.subscribe_once(self.key_to_topic(key, request["response_code"]))
+        self.client.publish(self.key_to_topic(key, "r"), self.data_to_mqtt_message(request))
         return request
 
     def __on_new_message__(self, topic, message):
         key = self.topic_to_key(topic)
         data = self.mqtt_message_to_data(message)
 
-        if topic.startswith("alv1/") and not topic.startswith("alv1/w") and not topic.startswith("alv1/r"):
+        if (
+            topic.startswith("alv1/")
+            and not topic.startswith("alv1/w")
+            and not topic.startswith("alv1/r")
+        ):
             self.__read_request_data__[key] = data
         else:
             self.on_new_data(key, data)
