@@ -215,5 +215,4 @@ class MqttUtils:
         """
         Derive a topic from a namespace key, according to the Aleph v1 protocol
         """
-        assert verb in ["w", "r", "c"], f"Invalid verb '{verb}'"
         return f"{cls.ALEPH_V1_PROTOCOL}/{verb}/{str(key).replace('.', '/')}"

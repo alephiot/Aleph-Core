@@ -1,4 +1,4 @@
-from time import time, sleep
+import time
 
 
 def loop() -> None:
@@ -6,11 +6,11 @@ def loop() -> None:
     Run an infinite loop
     """
     while True:
-        sleep(0.1)
+        time.sleep(0.1)
 
 
 def current_timestamp() -> int:
     """
     Returns the current time in milliseconds
     """
-    return int(time() * 1000)
+    return int(time.time() * 1000)

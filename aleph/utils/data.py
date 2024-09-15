@@ -68,5 +68,3 @@ class Model(pydantic.BaseModel):
         """
         cls_ = cls.to_all_optionals_model()
         return cls_(**subrecord).dict(exclude_defaults=True, exclude_unset=True)
-
-

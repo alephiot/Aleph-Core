@@ -39,8 +39,9 @@ class RecordSet:
         for record in records:
             if model and not isinstance(record, model):
                 record = model(**record).dict()
+            if not isinstance(record, dict):
+                record = dict(record)
 
-            assert isinstance(record, dict)
             record = record.copy()
             record["t"] = record.get("t", now)
             record["id_"] = record.get("id_")

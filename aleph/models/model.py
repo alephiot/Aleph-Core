@@ -24,6 +24,9 @@ class Model(BaseModel):
 
     __optional__: Optional[Type[BaseModel]] = None
 
+    class Config:
+        use_enum_values = True
+
     @classmethod
     def to_all_optionals_model(cls) -> Type[BaseModel]:
         """

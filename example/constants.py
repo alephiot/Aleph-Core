@@ -1,2 +1,3 @@
 class Namespace:
-    USERS = "example.users"
+    PERSONS = "example.persons"
+    BATCHES = "example.batches"
